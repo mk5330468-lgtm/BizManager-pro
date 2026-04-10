@@ -100,15 +100,26 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       {error && (
-        <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 p-4 rounded-xl flex items-center gap-3 text-rose-700 dark:text-rose-400">
-          <AlertTriangle size={20} />
-          <p className="flex-1">{error}</p>
-          <button 
-            onClick={() => window.dispatchEvent(new CustomEvent('refresh-data'))}
-            className="text-sm font-semibold underline hover:no-underline"
-          >
-            Try Again
-          </button>
+        <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 p-4 rounded-xl flex flex-col gap-3 text-rose-700 dark:text-rose-400">
+          <div className="flex items-center gap-3">
+            <AlertTriangle size={20} />
+            <p className="flex-1">{error}</p>
+            <button 
+              onClick={() => window.dispatchEvent(new CustomEvent('refresh-data'))}
+              className="text-sm font-semibold underline hover:no-underline"
+            >
+              Try Again
+            </button>
+          </div>
+          <div className="flex items-center gap-2 pl-8">
+            <p className="text-xs opacity-80">Having trouble? Check your system status:</p>
+            <Link 
+              to="/diagnostics"
+              className="text-xs font-bold underline hover:no-underline flex items-center gap-1"
+            >
+              Run Diagnostics <ArrowUpRight size={12} />
+            </Link>
+          </div>
         </div>
       )}
       <motion.div 

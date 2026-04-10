@@ -145,23 +145,41 @@ async function startServer() {
   // Health check endpoint
   app.get("/api/health", async (req, res) => {
     if (!supabase) {
-      return res.status(500).json({ status: 'error', message: 'Supabase client not initialized' });
+      return res.status(500).json({ 
+        status: 'error', 
+        message: 'Supabase client not initialized',
+        env: {
+          hasUrl: !!process.env.SUPABASE_URL,
+          hasKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+        }
+      });
     }
     
     let bucketStatus = 'unknown';
+    let tableStatus: any = {};
+    
     try {
       const { data: buckets } = await supabase.storage.listBuckets();
       const hasInvoices = buckets?.some((b: any) => b.name === 'invoices');
       bucketStatus = hasInvoices ? 'exists' : 'missing';
-    } catch (e) {
-      bucketStatus = 'error';
+      
+      // Check for critical tables
+      const tables = ['profiles', 'customers', 'products', 'invoices', 'payments', 'accounts'];
+      for (const table of tables) {
+        const { error } = await supabase.from(table).select('count', { count: 'exact', head: true });
+        tableStatus[table] = error ? (error.code === '42P01' ? 'missing' : 'error: ' + error.message) : 'ok';
+      }
+    } catch (e: any) {
+      bucketStatus = 'error: ' + e.message;
     }
 
     res.json({ 
       status: "ok", 
       timestamp: new Date().toISOString(),
       supabaseInitialized: true,
-      bucketStatus
+      bucketStatus,
+      tableStatus,
+      vercel: !!process.env.VERCEL
     });
   });
 
@@ -238,16 +256,60 @@ async function startServer() {
 
   // Dashboard Stats
   app.get("/api/dashboard/stats", async (req: any, res) => {
+    const debugLogs: string[] = [];
     try {
       const { businessId } = req;
-      if (!businessId) return res.status(400).json({ error: "Business ID required" });
+      if (!businessId) {
+        return res.status(400).json({ error: "Business ID required" });
+      }
+
+      debugLogs.push(`Fetching stats for businessId: ${businessId}`);
+      console.log(`[GET /api/dashboard/stats] ${debugLogs[debugLogs.length-1]}`);
 
       // Ensure default accounts exist
-      await ensureDefaultAccounts(businessId);
+      try {
+        await ensureDefaultAccounts(businessId);
+        debugLogs.push("Default accounts checked/created");
+      } catch (accError: any) {
+        debugLogs.push(`ensureDefaultAccounts failed: ${accError.message}`);
+        console.error(`[GET /api/dashboard/stats] ${debugLogs[debugLogs.length-1]}`);
+      }
 
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+      debugLogs.push(`Date ranges: todayStart=${todayStart}, monthStart=${monthStart}`);
+
+      const queries = [
+        supabase.from('payments').select('amount, payment_mode, invoice_id').eq('business_id', businessId).gte('payment_date', todayStart),
+        supabase.from('invoices').select('id, total_amount').eq('business_id', businessId).gte('created_at', todayStart),
+        supabase.from('payments').select('amount, payment_mode, invoice_id').eq('business_id', businessId).gte('payment_date', monthStart),
+        supabase.from('invoices').select('id, total_amount').eq('business_id', businessId).gte('created_at', monthStart),
+        supabase.from('payments').select('amount, payment_mode, invoice_id').eq('business_id', businessId),
+        supabase.from('invoices').select('id, total_amount').eq('business_id', businessId),
+        supabase.from('customers').select('outstanding_balance').eq('business_id', businessId),
+        supabase.from('products').select('id, stock_quantity, low_stock_alert').eq('business_id', businessId),
+        supabase.from('accounts').select('*').eq('business_id', businessId)
+      ];
+
+      debugLogs.push("Executing parallel queries...");
+      const results = await Promise.all(queries);
+      debugLogs.push("Parallel queries completed");
+
+      // Check for errors in any of the results
+      results.forEach((result, index) => {
+        if (result.error) {
+          const msg = `Query ${index} failed: ${result.error.message} (${result.error.code})`;
+          debugLogs.push(msg);
+          console.error(`[GET /api/dashboard/stats] ${msg}`);
+          
+          // If it's a "missing table" error, we should probably stop and inform the user
+          if (result.error.code === '42P01') {
+            throw new Error(`Database table missing: ${result.error.message}. Please run the SQL schema in Supabase.`);
+          }
+        }
+      });
 
       const [
         { data: todayPayments },
@@ -258,39 +320,22 @@ async function startServer() {
         { data: allInvoicesData },
         { data: customersData },
         { data: productsData },
-        { data: accountsData },
-        paymentModesResult
-      ] = await Promise.all([
-        supabase.from('payments').select('amount, payment_mode, invoice_id').eq('business_id', businessId).gte('payment_date', todayStart),
-        supabase.from('invoices').select('id, total_amount').eq('business_id', businessId).gte('created_at', todayStart),
-        supabase.from('payments').select('amount, payment_mode, invoice_id').eq('business_id', businessId).gte('payment_date', monthStart),
-        supabase.from('invoices').select('id, total_amount').eq('business_id', businessId).gte('created_at', monthStart),
-        supabase.from('payments').select('amount, payment_mode, invoice_id').eq('business_id', businessId),
-        supabase.from('invoices').select('id, total_amount').eq('business_id', businessId),
-        supabase.from('customers').select('outstanding_balance').eq('business_id', businessId),
-        supabase.from('products').select('id, stock_quantity, low_stock_alert').eq('business_id', businessId),
-        supabase.from('accounts').select('*').eq('business_id', businessId),
-        (async () => {
-          try {
-            return await supabase.rpc('get_payment_modes_summary', { b_id: businessId });
-          } catch (err) {
-            console.warn('RPC get_payment_modes_summary failed:', err);
-            return { data: null };
-          }
-        })()
-      ]);
+        { data: accountsData }
+      ] = results;
       
-      const paymentModesData = (paymentModesResult as any)?.data || null;
+      debugLogs.push("Data destructured successfully");
 
-      // Fallback for payment modes if RPC fails or isn't used
-      let finalPaymentModes = paymentModesData;
-      if (!finalPaymentModes || finalPaymentModes.length === 0) {
-        const summary: any = {};
-        allPaymentsData?.forEach(p => {
-          summary[p.payment_mode] = (summary[p.payment_mode] || 0) + (p.amount || 0);
+      // Fallback for payment modes
+      const summary: any = {};
+      if (allPaymentsData) {
+        allPaymentsData.forEach(p => {
+          if (p.payment_mode) {
+            summary[p.payment_mode] = (summary[p.payment_mode] || 0) + (p.amount || 0);
+          }
         });
-        finalPaymentModes = Object.entries(summary).map(([mode, total]) => ({ payment_mode: mode, total }));
       }
+      const finalPaymentModes = Object.entries(summary).map(([mode, total]) => ({ payment_mode: mode, total }));
+      debugLogs.push(`Calculated ${finalPaymentModes.length} payment modes`);
 
       const todayCollections = todayPayments?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0;
       const todayCashReceived = todayPayments?.filter((p: any) => p.payment_mode?.toLowerCase() === 'cash').reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0;
@@ -314,14 +359,20 @@ async function startServer() {
       const pendingPayments = customersData?.reduce((sum: number, c: any) => sum + (c.outstanding_balance || 0), 0) || 0;
       const lowStockCount = productsData?.filter((p: any) => p.stock_quantity <= p.low_stock_alert).length || 0;
 
-      const { data: pendingCustomers } = await supabase
+      debugLogs.push("Fetching pending customers...");
+      const { data: pendingCustomers, error: pendingError } = await supabase
         .from('customers')
         .select('id, name, phone, outstanding_balance')
         .eq('business_id', businessId)
         .gt('outstanding_balance', 0)
         .order('outstanding_balance', { ascending: false })
         .limit(5);
+      
+      if (pendingError) {
+        debugLogs.push(`Pending customers query failed: ${pendingError.message}`);
+      }
 
+      debugLogs.push("Sending response");
       res.json({
         todaySales,
         todayCollections,
@@ -341,9 +392,12 @@ async function startServer() {
         pendingCustomers: pendingCustomers || [],
         accounts: accountsData || []
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching dashboard data:", error);
-      res.status(500).json({ error: "Failed to fetch dashboard stats" });
+      res.status(500).json({ 
+        error: error.message || "Failed to fetch dashboard stats",
+        debug: debugLogs
+      });
     }
   });
 
@@ -2082,8 +2136,16 @@ async function startServer() {
       res.json(data);
     } catch (error: any) {
       console.error("[GET /api/business] Final error catch:", error);
+      
+      let message = error.message || "Failed to fetch business profile";
+      if (error.code === '42P01') {
+        message = `Database table missing: ${error.message}. Please run the SQL schema in Supabase.`;
+      } else if (error.message?.includes('row-level security policy')) {
+        message = "Supabase RLS policy violation. Please ensure SUPABASE_SERVICE_ROLE_KEY is correctly set in Vercel secrets.";
+      }
+      
       res.status(500).json({ 
-        error: error.message || "Failed to fetch business profile",
+        error: message,
         code: error.code,
         details: error.details,
         hint: "If you see RLS errors, ensure SUPABASE_SERVICE_ROLE_KEY is set in your environment variables. Check the server logs for 'Supabase Initialization Debug' to verify the key is loaded."

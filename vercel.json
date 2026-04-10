@@ -1,5 +1,12 @@
 {
   "version": 2,
+  "functions": {
+    "api/index.ts": {
+      "runtime": "vercel-node@latest",
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",

@@ -1,5 +1,5 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
+// import { createServer as createViteServer } from "vite"; // Moved to dynamic import
 import path from "path";
 import { fileURLToPath } from "url";
 import { createClient } from "@supabase/supabase-js";
@@ -2915,6 +2915,7 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -2928,6 +2929,16 @@ async function startServer() {
       res.sendFile(path.join(__dirname, "../dist", "index.html"));
     });
   }
+
+  // Global error handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("Unhandled Express Error:", err);
+    res.status(500).json({ 
+      error: "Internal Server Error", 
+      message: err.message || "An unexpected error occurred",
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+  });
 
   // Only listen if not running as a serverless function (e.g., on Vercel)
   if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {

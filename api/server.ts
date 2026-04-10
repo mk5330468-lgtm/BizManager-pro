@@ -6,7 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import multer from "multer";
 import dotenv from "dotenv";
 import fs from "fs";
-import puppeteer from "puppeteer";
+// import puppeteer from "puppeteer"; // Moved to dynamic import inside generateAndUploadInvoiceAssets
 
 console.log("-----------------------------------------");
 console.log("Environment Debugging:");
@@ -179,7 +179,13 @@ async function startServer() {
       supabaseInitialized: true,
       bucketStatus,
       tableStatus,
-      vercel: !!process.env.VERCEL
+      vercel: !!process.env.VERCEL,
+      env: {
+        nodeEnv: process.env.NODE_ENV,
+        hasUrl: !!process.env.SUPABASE_URL,
+        hasKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+        cwd: process.cwd()
+      }
     });
   });
 
@@ -2014,14 +2020,27 @@ async function startServer() {
 
   // Business Profile API
   app.get("/api/business/:id", async (req, res) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', req.params.id)
-      .single();
-    
-    if (error) return res.status(500).json({ error: error.message });
-    res.json(data);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', req.params.id)
+        .single();
+      
+      if (error) {
+        if (error.code === '42P01') {
+          return res.status(500).json({ 
+            error: `Database table missing: ${error.message}. Please run the SQL schema in Supabase.`,
+            code: error.code
+          });
+        }
+        return res.status(500).json({ error: error.message });
+      }
+      res.json(data);
+    } catch (error: any) {
+      console.error("[GET /api/business/:id] Error:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch business profile" });
+    }
   });
 
   app.put("/api/business/:id", async (req, res) => {
@@ -2619,6 +2638,9 @@ async function startServer() {
       
       const html = getInvoiceHTMLForBackend(invoice, business);
       
+      // Dynamic import for puppeteer to prevent startup crashes on Vercel
+      const puppeteer = (await import("puppeteer")).default;
+      
       browser = await puppeteer.launch({
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
         headless: true
@@ -2898,7 +2920,9 @@ async function startServer() {
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (!process.env.VERCEL) {
+    // Only serve static files manually if NOT on Vercel
+    // Vercel handles static files via vercel.json rewrites
     app.use(express.static(path.join(__dirname, "../dist")));
     app.get("*", (req, res) => {
       res.sendFile(path.join(__dirname, "../dist", "index.html"));

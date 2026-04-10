@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "engines": {
-    "node": "20.x"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "tsx api/server.ts",
@@ -24,7 +24,7 @@
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
-    "glob": "^13.0.6",
+    "glob": "^11.0.0",
     "html2canvas": "^1.4.1",
     "html2pdf.js": "^0.14.0",
     "jspdf": "^4.2.0",
@@ -32,7 +32,6 @@
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "multer": "^2.1.1",
-    "node-domexception": "^2.0.2",
     "puppeteer": "^24.40.0",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",

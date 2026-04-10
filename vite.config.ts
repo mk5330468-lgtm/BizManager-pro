@@ -9,6 +9,8 @@ export default defineConfig(({mode}) => {
     plugins: [react(), tailwindcss()],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'process.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || env.SUPABASE_URL),
+      'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY),
     },
     build: {
       rollupOptions: {
@@ -18,10 +20,13 @@ export default defineConfig(({mode}) => {
             'vendor-ui': ['lucide-react', 'motion'],
             'vendor-utils': ['date-fns', 'clsx', 'tailwind-merge'],
             'vendor-charts': ['recharts'],
+            'vendor-pdf': ['jspdf', 'jspdf-autotable', 'html2canvas'],
+            'vendor-supabase': ['@supabase/supabase-js'],
+            'vendor-genai': ['@google/genai'],
           },
         },
       },
-      chunkSizeWarningLimit: 1000,
+      chunkSizeWarningLimit: 1500,
     },
     resolve: {
       alias: {

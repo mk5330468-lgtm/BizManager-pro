@@ -71,17 +71,20 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Initialize Supabase client
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 
 console.log("Supabase Initialization Debug:");
 console.log(`- URL present: ${!!supabaseUrl}`);
-console.log(`- Service Key present: ${!!supabaseServiceKey}`);
+console.log(`- Key present: ${!!supabaseServiceKey}`);
+if (supabaseUrl) console.log(`- URL starts with: ${supabaseUrl.substring(0, 15)}...`);
 
 if (supabaseServiceKey) {
-  console.log(`- Service Key length: ${supabaseServiceKey.length}`);
+  const isServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY !== undefined;
+  console.log(`- Key type: ${isServiceKey ? 'Service Role' : 'Anon/Other'}`);
+  console.log(`- Key length: ${supabaseServiceKey.length}`);
   if (supabaseServiceKey.length < 100) {
-    console.warn("- WARNING: Service Key seems too short. Are you sure it's the service_role key?");
+    console.warn("- WARNING: Key seems too short. Are you sure it's the correct Supabase key?");
   }
 }
 
@@ -108,7 +111,12 @@ if (!supabaseUrl || !supabaseServiceKey) {
     supabase.from('profiles').select('count', { count: 'exact', head: true })
       .then(({ error }: any) => {
         if (error) {
-          console.error("- Supabase connection test FAILED:", error.message);
+          if (error.message.includes('relation "profiles" does not exist')) {
+            console.error("- Supabase connection test FAILED: Database tables are missing.");
+            console.error("  ACTION REQUIRED: Please run the SQL schema in your Supabase SQL Editor.");
+          } else {
+            console.error("- Supabase connection test FAILED:", error.message);
+          }
         } else {
           console.log("- Supabase connection test successful.");
         }

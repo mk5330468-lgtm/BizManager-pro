@@ -216,6 +216,103 @@ export default function Diagnostics() {
 
       <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="flex items-center gap-4 mb-6">
+          <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+            <Database size={24} />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Database Schema</h3>
+            <p className="text-slate-500 dark:text-slate-400">If you see "table missing" errors, you need to run this SQL in your Supabase SQL Editor.</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="relative">
+            <pre className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl text-xs overflow-x-auto max-h-64 text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-700">
+{`-- 1. Run this in Supabase SQL Editor
+-- This creates the essential tables for the app
+
+CREATE TABLE IF NOT EXISTS profiles (
+  id UUID PRIMARY KEY,
+  business_name TEXT NOT NULL,
+  owner_name TEXT,
+  email TEXT,
+  phone TEXT UNIQUE,
+  address TEXT,
+  invoice_theme TEXT DEFAULT 'gst',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS customers (
+  id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  outstanding_balance DECIMAL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS products (
+  id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  purchase_price DECIMAL NOT NULL,
+  selling_price DECIMAL NOT NULL,
+  stock_quantity INTEGER DEFAULT 0,
+  low_stock_alert INTEGER DEFAULT 5,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS invoices (
+  id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  invoice_number TEXT NOT NULL,
+  customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  total_amount DECIMAL NOT NULL,
+  payment_status TEXT CHECK(payment_status IN ('paid', 'unpaid', 'partial')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(business_id, invoice_number)
+);
+
+CREATE TABLE IF NOT EXISTS payments (
+  id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  invoice_id BIGINT REFERENCES invoices(id) ON DELETE CASCADE,
+  amount DECIMAL NOT NULL,
+  payment_mode TEXT,
+  payment_date TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS accounts (
+  id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  balance DECIMAL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);`}
+            </pre>
+            <button 
+              onClick={() => {
+                navigator.clipboard.writeText(`-- Run this in Supabase SQL Editor
+CREATE TABLE IF NOT EXISTS profiles ( id UUID PRIMARY KEY, business_name TEXT NOT NULL, owner_name TEXT, email TEXT, phone TEXT UNIQUE, address TEXT, invoice_theme TEXT DEFAULT 'gst', created_at TIMESTAMPTZ DEFAULT NOW() );
+CREATE TABLE IF NOT EXISTS customers ( id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY, business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE, name TEXT NOT NULL, outstanding_balance DECIMAL DEFAULT 0, created_at TIMESTAMPTZ DEFAULT NOW() );
+CREATE TABLE IF NOT EXISTS products ( id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY, business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE, name TEXT NOT NULL, purchase_price DECIMAL NOT NULL, selling_price DECIMAL NOT NULL, stock_quantity INTEGER DEFAULT 0, low_stock_alert INTEGER DEFAULT 5, created_at TIMESTAMPTZ DEFAULT NOW() );
+CREATE TABLE IF NOT EXISTS invoices ( id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY, business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE, invoice_number TEXT NOT NULL, customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE, total_amount DECIMAL NOT NULL, payment_status TEXT CHECK(payment_status IN ('paid', 'unpaid', 'partial')), created_at TIMESTAMPTZ DEFAULT NOW(), UNIQUE(business_id, invoice_number) );
+CREATE TABLE IF NOT EXISTS payments ( id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY, business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE, invoice_id BIGINT REFERENCES invoices(id) ON DELETE CASCADE, amount DECIMAL NOT NULL, payment_mode TEXT, payment_date TIMESTAMPTZ DEFAULT NOW() );
+CREATE TABLE IF NOT EXISTS accounts ( id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY, business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE, name TEXT NOT NULL, balance DECIMAL DEFAULT 0, created_at TIMESTAMPTZ DEFAULT NOW() );`);
+                alert('SQL copied to clipboard!');
+              }}
+              className="absolute top-2 right-2 p-2 bg-white dark:bg-slate-700 rounded-lg shadow-sm hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors text-xs font-bold"
+            >
+              Copy SQL
+            </button>
+          </div>
+          <p className="text-xs text-slate-500">
+            <b>Note:</b> For the full schema including RLS policies and triggers, refer to the <code>supabase-schema.sql</code> file in the project root.
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div className="flex items-center gap-4 mb-6">
           <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400">
             <RefreshCw size={24} />
           </div>

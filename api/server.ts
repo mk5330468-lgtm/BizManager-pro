@@ -314,13 +314,18 @@ async function startServer() {
       // Check for errors in any of the results
       results.forEach((result, index) => {
         if (result.error) {
-          const msg = `Query ${index} failed: ${result.error.message} (${result.error.code})`;
+          const tableNames = ['payments', 'invoices', 'payments_monthly', 'invoices_monthly', 'payments_all', 'invoices_all', 'customers', 'products', 'accounts'];
+          const tableName = tableNames[index] || 'unknown';
+          const msg = `Query for "${tableName}" failed: ${result.error.message} (${result.error.code})`;
           debugLogs.push(msg);
           console.error(`[GET /api/dashboard/stats] ${msg}`);
           
           // If it's a "missing table" error, we should probably stop and inform the user
           if (result.error.code === '42P01') {
-            throw new Error(`Database table missing: ${result.error.message}. Please run the SQL schema in Supabase.`);
+            const err = new Error(`Database table "${tableName}" is missing. Please run the SQL schema in your Supabase SQL Editor.`);
+            (err as any).code = '42P01';
+            (err as any).tableName = tableName;
+            throw err;
           }
         }
       });
@@ -410,7 +415,10 @@ async function startServer() {
       console.error("Error fetching dashboard data:", error);
       res.status(500).json({ 
         error: error.message || "Failed to fetch dashboard stats",
-        debug: debugLogs
+        code: error.code,
+        tableName: error.tableName,
+        debug: debugLogs,
+        hint: error.code === '42P01' ? "Run the SQL schema in Supabase SQL Editor" : "Check Vercel logs for full details"
       });
     }
   });
@@ -2958,5 +2966,8 @@ async function startServer() {
   return app;
 }
 
-export const appPromise = startServer();
+export const appPromise = startServer().catch(err => {
+  console.error("CRITICAL: Failed to start server:", err);
+  throw err;
+});
 export default appPromise;

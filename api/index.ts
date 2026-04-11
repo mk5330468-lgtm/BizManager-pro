@@ -1,4 +1,4 @@
-import appPromise from './server';
+import appPromise from './server.js';
 
 export default async (req: any, res: any) => {
   // Simple ping test to verify function reachability

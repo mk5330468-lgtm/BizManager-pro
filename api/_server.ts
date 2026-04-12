@@ -72,32 +72,37 @@ const __dirname = path.dirname(__filename);
 
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+
+// Use service role key if available, otherwise fallback to anon key (which will likely fail for admin tasks)
+const activeKey = supabaseServiceKey || supabaseAnonKey;
 
 console.log("Supabase Initialization Debug:");
 console.log(`- URL present: ${!!supabaseUrl}`);
-console.log(`- Key present: ${!!supabaseServiceKey}`);
+console.log(`- Service Role Key present: ${!!supabaseServiceKey}`);
+console.log(`- Anon Key present: ${!!supabaseAnonKey}`);
+
 if (supabaseUrl) console.log(`- URL starts with: ${supabaseUrl.substring(0, 15)}...`);
 
 if (supabaseServiceKey) {
-  const isServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY !== undefined;
-  console.log(`- Key type: ${isServiceKey ? 'Service Role' : 'Anon/Other'}`);
-  console.log(`- Key length: ${supabaseServiceKey.length}`);
+  console.log(`- Service Role Key length: ${supabaseServiceKey.length}`);
   if (supabaseServiceKey.length < 100) {
-    console.warn("- WARNING: Key seems too short. Are you sure it's the correct Supabase key?");
+    console.warn("- WARNING: SUPABASE_SERVICE_ROLE_KEY seems too short. It should be a long JWT string.");
   }
+} else {
+  console.warn("- WARNING: SUPABASE_SERVICE_ROLE_KEY is missing. Backend operations like profile creation and bucket setup will likely fail.");
 }
 
 let supabase: any = null;
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error("CRITICAL: Supabase URL or Service Role Key is missing from environment variables.");
-  console.error("The server will start, but database operations will fail until these are set in Settings > Secrets.");
+if (!supabaseUrl || !activeKey) {
+  console.error("CRITICAL: Supabase URL or API Key is missing from environment variables.");
 } else {
   try {
     supabase = createClient(
       supabaseUrl,
-      supabaseServiceKey,
+      activeKey,
       {
         auth: {
           autoRefreshToken: false,
@@ -105,7 +110,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
         }
       }
     );
-    console.log("- Supabase client initialized successfully.");
+    console.log(`- Supabase client initialized successfully using ${supabaseServiceKey ? 'SERVICE_ROLE' : 'ANON'} key.`);
     
     // Test query to verify connection and permissions
     supabase.from('profiles').select('count', { count: 'exact', head: true })
@@ -238,7 +243,10 @@ async function startServer() {
 
   // Function to ensure storage buckets exist
   const ensureBuckets = async () => {
-    if (!supabase) return;
+    if (!supabase || !supabaseServiceKey) {
+      console.log("Skipping bucket check: SUPABASE_SERVICE_ROLE_KEY is missing.");
+      return;
+    }
     try {
       const buckets = ['invoices', 'business_logos'];
       const { data: existingBuckets } = await supabase.storage.listBuckets();
@@ -249,7 +257,11 @@ async function startServer() {
           console.log(`Creating bucket: ${bucketName}`);
           const { error: createError } = await supabase.storage.createBucket(bucketName, { public: true });
           if (createError) {
-            console.error(`Failed to create bucket ${bucketName}:`, createError.message);
+            if (createError.message.includes('already exists')) {
+              console.log(`Bucket ${bucketName} already exists.`);
+            } else {
+              console.error(`Failed to create bucket ${bucketName}:`, createError.message);
+            }
           } else {
             console.log(`Successfully created bucket: ${bucketName}`);
           }
@@ -2147,8 +2159,11 @@ async function startServer() {
             });
             
             if (createError.message.includes('row-level security policy')) {
-              console.error("CRITICAL: RLS policy violation detected even though we are trying to create a profile.");
-              console.error("This usually means the SUPABASE_SERVICE_ROLE_KEY is either missing, invalid, or not a real service_role key.");
+              return res.status(500).json({ 
+                error: "Configuration Error", 
+                message: "The server is missing the SUPABASE_SERVICE_ROLE_KEY or the key is incorrect. This key is required to create new business profiles.",
+                hint: "Please add SUPABASE_SERVICE_ROLE_KEY to your Vercel Environment Variables. You can find it in Supabase > Settings > API > service_role key."
+              });
             }
             throw createError;
           }
@@ -2168,6 +2183,7 @@ async function startServer() {
         }
         throw error;
       }
+      console.log(`[GET /api/business] Profile found for ${id}.`);
       res.json(data);
     } catch (error: any) {
       console.error("[GET /api/business] Final error catch:", error);

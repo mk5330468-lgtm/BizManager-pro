@@ -2655,11 +2655,23 @@ async function startServer() {
       const html = getInvoiceHTMLForBackend(invoice, business);
       
       // Dynamic import for puppeteer to prevent startup crashes on Vercel
-      const puppeteer = (await import("puppeteer")).default;
+      let puppeteer;
+      let executablePath;
+      
+      if (process.env.VERCEL) {
+        // Vercel environment
+        const chromium = (await import("@sparticuz/chromium")).default;
+        puppeteer = (await import("puppeteer-core")).default;
+        executablePath = await chromium.executablePath();
+      } else {
+        // Local environment
+        puppeteer = (await import("puppeteer")).default;
+      }
       
       browser = await puppeteer.launch({
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        headless: true
+        args: process.env.VERCEL ? (await import("@sparticuz/chromium")).default.args : ['--no-sandbox', '--disable-setuid-sandbox'],
+        executablePath: executablePath,
+        headless: process.env.VERCEL ? (await import("@sparticuz/chromium")).default.headless : true
       });
       
       const page = await browser.newPage();

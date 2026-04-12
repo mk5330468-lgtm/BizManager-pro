@@ -7,8 +7,8 @@
     "node": "24.x"
   },
   "scripts": {
-    "dev": "tsx api/server.ts",
-    "start": "node api/server.ts",
+    "dev": "tsx api/_server.ts",
+    "start": "node api/_server.ts",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",

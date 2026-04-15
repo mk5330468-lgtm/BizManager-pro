@@ -369,7 +369,7 @@ Thank you!`;
                     required
                     type="text" 
                     className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white outline-none"
-                    value={formData.name}
+                    value={formData.name || ''}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
                   />
                 </div>
@@ -379,7 +379,7 @@ Thank you!`;
                     <input 
                       type="text" 
                       className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white outline-none"
-                      value={formData.phone}
+                      value={formData.phone || ''}
                       onChange={(e) => setFormData({...formData, phone: e.target.value})}
                     />
                   </div>
@@ -388,7 +388,7 @@ Thank you!`;
                     <input 
                       type="text" 
                       className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white outline-none"
-                      value={formData.gst_number}
+                      value={formData.gst_number || ''}
                       onChange={(e) => setFormData({...formData, gst_number: e.target.value})}
                     />
                   </div>
@@ -398,7 +398,7 @@ Thank you!`;
                   <input 
                     type="email" 
                     className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white outline-none"
-                    value={formData.email}
+                    value={formData.email || ''}
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
                   />
                 </div>
@@ -407,7 +407,7 @@ Thank you!`;
                   <textarea 
                     rows={2}
                     className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white outline-none resize-none"
-                    value={formData.address}
+                    value={formData.address || ''}
                     onChange={(e) => setFormData({...formData, address: e.target.value})}
                   />
                 </div>
@@ -417,7 +417,7 @@ Thank you!`;
                     rows={2}
                     placeholder="Add special instructions, preferences, or relationship notes..."
                     className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white outline-none resize-none"
-                    value={formData.notes}
+                    value={formData.notes || ''}
                     onChange={(e) => setFormData({...formData, notes: e.target.value})}
                   />
                 </div>
@@ -551,7 +551,7 @@ Thank you!`;
                         rows={2}
                         placeholder="Optional notes..."
                         className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white text-sm resize-none"
-                        value={paymentData.notes}
+                        value={paymentData.notes || ''}
                         onChange={(e) => setPaymentData({...paymentData, notes: e.target.value})}
                       />
                     </div>

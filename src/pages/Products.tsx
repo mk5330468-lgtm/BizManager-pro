@@ -309,7 +309,7 @@ export default function Products() {
                       required
                       type="text" 
                       className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white outline-none"
-                      value={formData.name}
+                      value={formData.name || ''}
                       onChange={(e) => setFormData({...formData, name: e.target.value})}
                     />
                   </div>
@@ -318,7 +318,7 @@ export default function Products() {
                     <input 
                       type="text" 
                       className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white outline-none"
-                      value={formData.category}
+                      value={formData.category || ''}
                       onChange={(e) => setFormData({...formData, category: e.target.value})}
                     />
                   </div>
@@ -327,7 +327,7 @@ export default function Products() {
                     <input 
                       type="text" 
                       className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white outline-none"
-                      value={formData.sku}
+                      value={formData.sku || ''}
                       onChange={(e) => setFormData({...formData, sku: e.target.value})}
                     />
                   </div>

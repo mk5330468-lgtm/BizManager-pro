@@ -1076,6 +1076,7 @@ export default function Purchases() {
                       required
                       type="number" 
                       className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white outline-none font-bold"
+                      placeholder="0"
                       value={expenseFormData.amount || ''}
                       onChange={(e) => setExpenseFormData({...expenseFormData, amount: e.target.value === '' ? 0 : Number(e.target.value)})}
                     />
@@ -1286,7 +1287,8 @@ export default function Purchases() {
                       required
                       type="number" 
                       className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white outline-none"
-                      value={newProductData.purchase_price ?? ''}
+                      placeholder="0"
+                      value={newProductData.purchase_price || ''}
                       onChange={(e) => setNewProductData({...newProductData, purchase_price: e.target.value === '' ? 0 : Number(e.target.value)})}
                     />
                   </div>
@@ -1296,7 +1298,8 @@ export default function Purchases() {
                       required
                       type="number" 
                       className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white outline-none"
-                      value={newProductData.selling_price ?? ''}
+                      placeholder="0"
+                      value={newProductData.selling_price || ''}
                       onChange={(e) => setNewProductData({...newProductData, selling_price: e.target.value === '' ? 0 : Number(e.target.value)})}
                     />
                   </div>
@@ -1307,7 +1310,8 @@ export default function Purchases() {
                     <input 
                       type="number" 
                       className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white outline-none"
-                      value={newProductData.stock_quantity ?? ''}
+                      placeholder="0"
+                      value={newProductData.stock_quantity || ''}
                       onChange={(e) => setNewProductData({...newProductData, stock_quantity: e.target.value === '' ? 0 : Number(e.target.value)})}
                     />
                   </div>
@@ -1316,7 +1320,8 @@ export default function Purchases() {
                     <input 
                       type="number" 
                       className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white outline-none"
-                      value={newProductData.tax_percentage ?? ''}
+                      placeholder="0"
+                      value={newProductData.tax_percentage || ''}
                       onChange={(e) => setNewProductData({...newProductData, tax_percentage: e.target.value === '' ? 0 : Number(e.target.value)})}
                     />
                   </div>

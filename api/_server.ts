@@ -948,7 +948,7 @@ async function startServer() {
 
   app.post("/api/invoices", async (req: any, res) => {
     try {
-      const { customer_id, items, subtotal, tax_amount, discount_amount, total_amount, payment_status, payment_mode, created_at, amount_paid, pdf_url } = req.body;
+      const { customer_id, items, subtotal, tax_amount, discount_amount, total_amount, payment_status, payment_mode, created_at, amount_paid, cash_amount, upi_amount, pdf_url } = req.body;
       
       // 1. Generate invoice number
       const { data: lastInvoices } = await supabase
@@ -966,11 +966,12 @@ async function startServer() {
         if (!isNaN(lastId)) nextId = lastId + 1;
       }
       
-      const now = new Date();
+      const dateObj = created_at ? new Date(created_at) : new Date();
       const monthNames = ["Ja", "Fe", "Mr", "Ap", "My", "Jn", "Jl", "Ag", "Se", "Oc", "No", "De"];
-      const monthAbbr = monthNames[now.getMonth()];
-      const yearShort = now.getFullYear().toString().slice(-2);
-      const invoice_number = `${monthAbbr}${yearShort}-${nextId}`;
+      const monthAbbr = monthNames[dateObj.getMonth()];
+      const yearShort = dateObj.getFullYear().toString().slice(-2);
+      const day = dateObj.getDate();
+      const invoice_number = `${monthAbbr} ${yearShort}-${day}-${nextId}`;
 
       // 2. Create Invoice
       const invoiceDate = created_at || new Date().toISOString();
@@ -986,6 +987,7 @@ async function startServer() {
           total_amount,
           payment_status,
           payment_mode,
+          amount_paid: amount_paid || 0,
           created_at: invoiceDate,
           pdf_url: pdf_url || null
         }])
@@ -1029,27 +1031,56 @@ async function startServer() {
       const balanceToUpdate = total_amount - paidAmount;
 
       if (paidAmount > 0) {
-        await supabase.from('payments').insert([{
-          business_id: req.businessId,
-          invoice_id: invoiceId,
-          customer_id,
-          amount: paidAmount,
-          payment_mode,
-          payment_date: invoiceDate
-        }]);
+        if (payment_mode === 'both') {
+          const cash = Number(cash_amount) || 0;
+          const upi = Number(upi_amount) || 0;
 
-        // Update account balance
-        try {
-          const { error: rpcError } = await supabase.rpc('increment_account_balance', {
-            b_id: req.businessId,
-            acc_name: payment_mode,
-            amt: paidAmount
-          });
-          if (rpcError) throw rpcError;
-        } catch (e) {
-          const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', payment_mode).single();
-          if (acc) {
-            await supabase.from('accounts').update({ balance: acc.balance + paidAmount, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', payment_mode);
+          if (cash > 0) {
+            await supabase.from('payments').insert([{
+              business_id: req.businessId,
+              invoice_id: invoiceId,
+              customer_id,
+              amount: cash,
+              payment_mode: 'cash',
+              payment_date: invoiceDate
+            }]);
+            await supabase.rpc('increment_account_balance', { b_id: req.businessId, acc_name: 'cash', amt: cash });
+          }
+
+          if (upi > 0) {
+            await supabase.from('payments').insert([{
+              business_id: req.businessId,
+              invoice_id: invoiceId,
+              customer_id,
+              amount: upi,
+              payment_mode: 'upi',
+              payment_date: invoiceDate
+            }]);
+            await supabase.rpc('increment_account_balance', { b_id: req.businessId, acc_name: 'upi', amt: upi });
+          }
+        } else {
+          await supabase.from('payments').insert([{
+            business_id: req.businessId,
+            invoice_id: invoiceId,
+            customer_id,
+            amount: paidAmount,
+            payment_mode,
+            payment_date: invoiceDate
+          }]);
+
+          // Update account balance
+          try {
+            const { error: rpcError } = await supabase.rpc('increment_account_balance', {
+              b_id: req.businessId,
+              acc_name: payment_mode,
+              amt: paidAmount
+            });
+            if (rpcError) throw rpcError;
+          } catch (e) {
+            const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', payment_mode).single();
+            if (acc) {
+              await supabase.from('accounts').update({ balance: acc.balance + paidAmount, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', payment_mode);
+            }
           }
         }
       }
@@ -1106,7 +1137,7 @@ async function startServer() {
 
   app.put("/api/invoices/:id", async (req: any, res) => {
     try {
-      const { customer_id, items, subtotal, tax_amount, discount_amount, total_amount, payment_status, payment_mode, created_at, amount_paid, pdf_url } = req.body;
+      const { customer_id, items, subtotal, tax_amount, discount_amount, total_amount, payment_status, payment_mode, created_at, amount_paid, cash_amount, upi_amount, pdf_url } = req.body;
       
       // 1. Get old invoice to reverse stock and balance
       const { data: oldInvoice, error: oldInvError } = await supabase
@@ -1139,7 +1170,7 @@ async function startServer() {
       // Reverse customer balance for the OLD customer
       const { data: oldPayments } = await supabase
         .from('payments')
-        .select('amount')
+        .select('amount, payment_mode')
         .eq('invoice_id', req.params.id);
       
       const oldPaid = oldPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
@@ -1153,14 +1184,15 @@ async function startServer() {
         if (cust) await supabase.from('customers').update({ outstanding_balance: cust.outstanding_balance - oldBalance }).eq('id', oldInvoice.customer_id);
       }
 
-      // Reverse account balance
-      if (oldPaid > 0) {
-        try {
-          const { error: rpcError } = await supabase.rpc('decrement_account_balance', { b_id: req.businessId, acc_name: oldInvoice.payment_mode, amt: oldPaid });
-          if (rpcError) throw rpcError;
-        } catch (e) {
-          const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', oldInvoice.payment_mode).single();
-          if (acc) await supabase.from('accounts').update({ balance: acc.balance - oldPaid, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', oldInvoice.payment_mode);
+      // Reverse account balance for each old payment
+      if (oldPayments && oldPayments.length > 0) {
+        for (const p of oldPayments) {
+          try {
+            await supabase.rpc('decrement_account_balance', { b_id: req.businessId, acc_name: p.payment_mode, amt: p.amount });
+          } catch (e) {
+            const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', p.payment_mode).single();
+            if (acc) await supabase.from('accounts').update({ balance: acc.balance - p.amount, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', p.payment_mode);
+          }
         }
       }
 
@@ -1175,6 +1207,7 @@ async function startServer() {
           total_amount,
           payment_status,
           payment_mode,
+          amount_paid: amount_paid || 0,
           created_at,
           pdf_url: pdf_url || null
         })
@@ -1210,22 +1243,51 @@ async function startServer() {
       await supabase.from('payments').delete().eq('invoice_id', req.params.id);
       const paidAmount = Number(amount_paid) || 0;
       if (paidAmount > 0) {
-        await supabase.from('payments').insert([{
-          business_id: req.businessId,
-          invoice_id: req.params.id,
-          customer_id,
-          amount: paidAmount,
-          payment_mode,
-          payment_date: created_at
-        }]);
+        if (payment_mode === 'both') {
+          const cash = Number(cash_amount) || 0;
+          const upi = Number(upi_amount) || 0;
 
-        // Apply new account balance
-        try {
-          const { error: rpcError } = await supabase.rpc('increment_account_balance', { b_id: req.businessId, acc_name: payment_mode, amt: paidAmount });
-          if (rpcError) throw rpcError;
-        } catch (e) {
-          const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', payment_mode).single();
-          if (acc) await supabase.from('accounts').update({ balance: acc.balance + paidAmount, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', payment_mode);
+          if (cash > 0) {
+            await supabase.from('payments').insert([{
+              business_id: req.businessId,
+              invoice_id: req.params.id,
+              customer_id,
+              amount: cash,
+              payment_mode: 'cash',
+              payment_date: created_at
+            }]);
+            await supabase.rpc('increment_account_balance', { b_id: req.businessId, acc_name: 'cash', amt: cash });
+          }
+
+          if (upi > 0) {
+            await supabase.from('payments').insert([{
+              business_id: req.businessId,
+              invoice_id: req.params.id,
+              customer_id,
+              amount: upi,
+              payment_mode: 'upi',
+              payment_date: created_at
+            }]);
+            await supabase.rpc('increment_account_balance', { b_id: req.businessId, acc_name: 'upi', amt: upi });
+          }
+        } else {
+          await supabase.from('payments').insert([{
+            business_id: req.businessId,
+            invoice_id: req.params.id,
+            customer_id,
+            amount: paidAmount,
+            payment_mode,
+            payment_date: created_at
+          }]);
+
+          // Apply new account balance
+          try {
+            const { error: rpcError } = await supabase.rpc('increment_account_balance', { b_id: req.businessId, acc_name: payment_mode, amt: paidAmount });
+            if (rpcError) throw rpcError;
+          } catch (e) {
+            const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', payment_mode).single();
+            if (acc) await supabase.from('accounts').update({ balance: acc.balance + paidAmount, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', payment_mode);
+          }
         }
       }
 
@@ -1918,46 +1980,111 @@ async function startServer() {
   });
 
   app.post("/api/payments/customer", async (req: any, res) => {
-    const { customer_id, amount, payment_mode, payment_date, notes } = req.body;
+    const { customer_id, amount, payment_mode, payment_date, notes, settlements, cash_amount, upi_amount } = req.body;
     
     try {
-      // 1. Record Payment
-      const { data: payment, error: pError } = await supabase
-        .from('payments')
-        .insert([{
-          business_id: req.businessId,
-          customer_id,
-          amount,
-          payment_mode,
-          payment_date: payment_date || new Date().toISOString(),
-          notes
-        }])
-        .select()
-        .single();
-      
-      if (pError) throw pError;
+      const results = [];
+      const totalAmount = payment_mode === 'both' ? (Number(cash_amount) + Number(upi_amount)) : Number(amount);
+
+      // Helper to record a payment and update account balance
+      const recordPayment = async (amt: number, mode: string, invId?: number, customNotes?: string) => {
+        const { data: payment, error: pError } = await supabase
+          .from('payments')
+          .insert([{
+            business_id: req.businessId,
+            customer_id,
+            invoice_id: invId,
+            amount: amt,
+            payment_mode: mode,
+            payment_date: payment_date || new Date().toISOString(),
+            notes: customNotes || notes
+          }])
+          .select()
+          .single();
+        
+        if (pError) throw pError;
+        
+        // Update Account Balance
+        try {
+          const { error: rpcError } = await supabase.rpc('increment_account_balance', { b_id: req.businessId, acc_name: mode, amt: amt });
+          if (rpcError) throw rpcError;
+        } catch (e) {
+          const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', mode).single();
+          if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + amt, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', mode);
+        }
+        
+        return payment;
+      };
+
+      if (settlements && Array.isArray(settlements) && settlements.length > 0) {
+        let remainingCash = payment_mode === 'both' ? Number(cash_amount) : (payment_mode === 'cash' ? totalAmount : 0);
+        let remainingUpi = payment_mode === 'both' ? Number(upi_amount) : (payment_mode === 'upi' ? totalAmount : 0);
+
+        for (const settlement of settlements) {
+          const { invoice_id, amount: settlementAmount } = settlement;
+          let amtToSettle = Number(settlementAmount);
+          if (amtToSettle <= 0) continue;
+
+          // Split settlement between cash and upi if needed
+          if (payment_mode === 'both') {
+            const fromCash = Math.min(amtToSettle, remainingCash);
+            if (fromCash > 0) {
+              results.push(await recordPayment(fromCash, 'cash', invoice_id, `Settlement for invoice #${invoice_id} (Cash part). ${notes || ''}`));
+              remainingCash -= fromCash;
+              amtToSettle -= fromCash;
+            }
+            
+            const fromUpi = Math.min(amtToSettle, remainingUpi);
+            if (fromUpi > 0) {
+              results.push(await recordPayment(fromUpi, 'upi', invoice_id, `Settlement for invoice #${invoice_id} (UPI part). ${notes || ''}`));
+              remainingUpi -= fromUpi;
+              amtToSettle -= fromUpi;
+            }
+          } else {
+            results.push(await recordPayment(amtToSettle, payment_mode, invoice_id, `Settlement for invoice #${invoice_id}. ${notes || ''}`));
+          }
+
+          // Update invoice status
+          const { data: invoice } = await supabase.from('invoices').select('total_amount').eq('id', invoice_id).single();
+          const { data: payments } = await supabase.from('payments').select('amount').eq('invoice_id', invoice_id);
+          const paidSoFar = payments?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) || 0;
+          
+          let status = 'partial';
+          if (paidSoFar >= Number(invoice.total_amount)) {
+            status = 'paid';
+          }
+          await supabase.from('invoices').update({ payment_status: status }).eq('id', invoice_id);
+        }
+
+        // Handle remaining amounts as general payments
+        if (remainingCash > 0) {
+          results.push(await recordPayment(remainingCash, 'cash', undefined, `General payment (Cash). ${notes || ''}`));
+        }
+        if (remainingUpi > 0) {
+          results.push(await recordPayment(remainingUpi, 'upi', undefined, `General payment (UPI). ${notes || ''}`));
+        }
+      } else {
+        // No settlements, just record general payment(s)
+        if (payment_mode === 'both') {
+          results.push(await recordPayment(Number(cash_amount), 'cash', undefined, `General payment (Cash). ${notes || ''}`));
+          results.push(await recordPayment(Number(upi_amount), 'upi', undefined, `General payment (UPI). ${notes || ''}`));
+        } else {
+          results.push(await recordPayment(totalAmount, payment_mode, undefined, notes));
+        }
+      }
 
       // 2. Update Customer Balance
       if (customer_id) {
         try {
-          const { error: rpcError } = await supabase.rpc('decrement_customer_balance', { c_id: customer_id, amt: amount, b_id: req.businessId });
+          const { error: rpcError } = await supabase.rpc('decrement_customer_balance', { c_id: customer_id, amt: totalAmount, b_id: req.businessId });
           if (rpcError) throw rpcError;
         } catch (e) {
           const { data: cust } = await supabase.from('customers').select('outstanding_balance').eq('id', customer_id).single();
-          if (cust) await supabase.from('customers').update({ outstanding_balance: cust.outstanding_balance - amount }).eq('id', customer_id);
+          if (cust) await supabase.from('customers').update({ outstanding_balance: Number(cust.outstanding_balance) - totalAmount }).eq('id', customer_id);
         }
       }
 
-      // 3. Update Account Balance
-      try {
-        const { error: rpcError } = await supabase.rpc('increment_account_balance', { b_id: req.businessId, acc_name: payment_mode, amt: amount });
-        if (rpcError) throw rpcError;
-      } catch (e) {
-        const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', payment_mode).single();
-        if (acc) await supabase.from('accounts').update({ balance: acc.balance + amount, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', payment_mode);
-      }
-
-      res.json(payment);
+      res.json(results[0] || { success: true });
     } catch (error: any) {
       console.error('Error recording payment:', error);
       res.status(500).json({ error: error.message || 'Failed to record payment' });
@@ -1975,7 +2102,28 @@ async function startServer() {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      res.json(data);
+
+      // Get payments for these invoices to calculate amount_paid
+      const invoiceIds = data?.map(i => i.id) || [];
+      const { data: payments } = await supabase
+        .from('payments')
+        .select('invoice_id, amount')
+        .in('invoice_id', invoiceIds)
+        .eq('business_id', req.businessId);
+
+      const paymentsMap: any = {};
+      payments?.forEach(p => {
+        if (p.invoice_id) {
+          paymentsMap[p.invoice_id] = (paymentsMap[p.invoice_id] || 0) + p.amount;
+        }
+      });
+
+      const formattedData = data?.map(i => ({
+        ...i,
+        amount_paid: paymentsMap[i.id] || 0
+      }));
+      
+      res.json(formattedData);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -2656,7 +2804,27 @@ async function startServer() {
         customer_name: (i as any).customers?.name
       }));
 
-      res.json(formattedData);
+      // Get payments for these invoices to calculate amount_paid
+      const invoiceIds = formattedData?.map(i => i.id) || [];
+      const { data: payments } = await supabase
+        .from('payments')
+        .select('invoice_id, amount')
+        .in('invoice_id', invoiceIds)
+        .eq('business_id', req.businessId);
+
+      const paymentsMap: any = {};
+      payments?.forEach(p => {
+        if (p.invoice_id) {
+          paymentsMap[p.invoice_id] = (paymentsMap[p.invoice_id] || 0) + p.amount;
+        }
+      });
+
+      const finalData = formattedData?.map(i => ({
+        ...i,
+        amount_paid: paymentsMap[i.id] || 0
+      }));
+
+      res.json(finalData);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

@@ -68,7 +68,7 @@ export interface Invoice {
   total_amount: number;
   amount_paid?: number;
   payment_status: 'paid' | 'unpaid' | 'partial';
-  payment_mode: 'cash' | 'upi';
+  payment_mode: 'cash' | 'upi' | 'both';
   pdf_url?: string;
   png_url?: string;
   created_at: string;
@@ -98,7 +98,7 @@ export interface Purchase {
   amount_paid?: number;
   balance_due: number;
   payment_status: 'paid' | 'unpaid' | 'partial';
-  payment_mode: 'cash' | 'upi';
+  payment_mode: 'cash' | 'upi' | 'both';
   purchase_date: string;
 }
 
@@ -108,7 +108,7 @@ export interface Expense {
   category: string;
   description: string;
   amount: number;
-  payment_mode: 'cash' | 'upi';
+  payment_mode: 'cash' | 'upi' | 'both';
   expense_date: string;
 }
 

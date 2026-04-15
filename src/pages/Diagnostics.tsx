@@ -267,7 +267,9 @@ CREATE TABLE IF NOT EXISTS invoices (
   invoice_number TEXT NOT NULL,
   customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
   total_amount DECIMAL NOT NULL,
+  amount_paid DECIMAL DEFAULT 0,
   payment_status TEXT CHECK(payment_status IN ('paid', 'unpaid', 'partial')),
+  payment_mode TEXT CHECK(payment_mode IN ('cash', 'upi', 'both')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(business_id, invoice_number)
 );

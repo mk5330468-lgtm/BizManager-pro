@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS purchases (
   amount_paid DECIMAL DEFAULT 0,
   balance_due DECIMAL DEFAULT 0,
   payment_status TEXT CHECK(payment_status IN ('paid', 'unpaid', 'partial')) DEFAULT 'unpaid',
-  payment_mode TEXT CHECK(payment_mode IN ('cash', 'upi')),
+  payment_mode TEXT CHECK(payment_mode IN ('cash', 'upi', 'both')),
   purchase_date TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(business_id, purchase_number)
 );
@@ -91,8 +91,9 @@ CREATE TABLE IF NOT EXISTS invoices (
   tax_amount DECIMAL NOT NULL,
   discount_amount DECIMAL DEFAULT 0,
   total_amount DECIMAL NOT NULL,
+  amount_paid DECIMAL DEFAULT 0,
   payment_status TEXT CHECK(payment_status IN ('paid', 'unpaid', 'partial')),
-  payment_mode TEXT CHECK(payment_mode IN ('cash', 'upi')),
+  payment_mode TEXT CHECK(payment_mode IN ('cash', 'upi', 'both')),
   pdf_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(business_id, invoice_number)
@@ -130,7 +131,7 @@ CREATE TABLE IF NOT EXISTS expenses (
   category TEXT NOT NULL,
   description TEXT,
   amount DECIMAL NOT NULL,
-  payment_mode TEXT CHECK(payment_mode IN ('cash', 'upi')),
+  payment_mode TEXT CHECK(payment_mode IN ('cash', 'upi', 'both')),
   expense_date TIMESTAMPTZ DEFAULT NOW()
 );
 

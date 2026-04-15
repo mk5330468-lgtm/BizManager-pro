@@ -15,6 +15,7 @@ import {
   Sun,
   Moon,
   ChevronDown,
+  ChevronUp,
   Building2,
   Plus,
   Wallet,
@@ -165,10 +166,15 @@ function AppContent() {
   const [paymentData, setPaymentData] = useState({
     customer_id: '',
     amount: '' as number | '',
-    payment_mode: 'cash' as 'cash' | 'upi',
+    cash_amount: '' as number | '',
+    upi_amount: '' as number | '',
+    payment_mode: '' as 'cash' | 'upi' | 'both' | '',
     payment_date: new Date().toISOString().split('T')[0],
     notes: ''
   });
+  const [pendingInvoices, setPendingInvoices] = useState<any[]>([]);
+  const [selectedInvoices, setSelectedInvoices] = useState<{[key: number]: number}>({});
+  const [showPendingInvoices, setShowPendingInvoices] = useState(true);
   const [business, setBusiness] = useState<any>(null);
 
   const { theme, toggleTheme } = useTheme();
@@ -208,6 +214,21 @@ function AppContent() {
   }, [user]);
 
   useEffect(() => {
+    if (paymentData.customer_id && isPayInModalOpen) {
+      supabaseService.getCustomerInvoices(Number(paymentData.customer_id))
+        .then(invoices => {
+          const pending = invoices.filter((i: any) => i.payment_status !== 'paid');
+          setPendingInvoices(pending);
+          setSelectedInvoices({});
+        })
+        .catch(err => console.error('Failed to fetch pending invoices:', err));
+    } else {
+      setPendingInvoices([]);
+      setSelectedInvoices({});
+    }
+  }, [paymentData.customer_id, isPayInModalOpen]);
+
+  useEffect(() => {
     if (user) {
       const isNewUser = localStorage.getItem('is_new_user');
       if (isNewUser === 'true') {
@@ -241,14 +262,30 @@ function AppContent() {
     e.preventDefault();
     if (!paymentData.amount || Number(paymentData.amount) <= 0) return alert('Please enter a valid amount');
 
+    const totalAmount = Number(paymentData.amount);
+    const settlements = Object.entries(selectedInvoices)
+      .filter(([_, amt]: [string, any]) => (Number(amt) || 0) > 0)
+      .map(([id, amt]) => ({
+        invoice_id: Number(id),
+        amount: amt
+      }));
+
+    const settledTotal = settlements.reduce((sum: number, s: any) => sum + (Number(s.amount) || 0), 0);
+    if (settledTotal > totalAmount) {
+      return alert(`Settled amount (${settledTotal}) cannot exceed total payment amount (${totalAmount})`);
+    }
+
     setPaymentLoading(true);
     try {
       await supabaseService.recordCustomerPayment({
         customer_id: paymentData.customer_id || null,
-        amount: Number(paymentData.amount),
+        amount: totalAmount,
+        cash_amount: paymentData.payment_mode === 'both' ? Number(paymentData.cash_amount) : undefined,
+        upi_amount: paymentData.payment_mode === 'both' ? Number(paymentData.upi_amount) : undefined,
         payment_mode: paymentData.payment_mode,
         payment_date: paymentData.payment_date,
-        notes: paymentData.notes
+        notes: paymentData.notes,
+        settlements: settlements.length > 0 ? settlements : undefined
       });
       setPaymentSuccess(true);
       // Refresh local customers list for the dropdown
@@ -304,7 +341,9 @@ function AppContent() {
                 setPaymentData({
                   customer_id: '',
                   amount: '',
-                  payment_mode: 'cash',
+                  cash_amount: '',
+                  upi_amount: '',
+                  payment_mode: '',
                   payment_date: new Date().toISOString().split('T')[0],
                   notes: ''
                 });
@@ -393,21 +432,6 @@ function AppContent() {
                       </select>
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Amount Received</label>
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
-                        <input 
-                          required
-                          type="number" 
-                          placeholder="0.00"
-                          className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white font-bold text-lg"
-                          value={paymentData.amount ?? ''}
-                          onChange={(e) => setPaymentData({...paymentData, amount: e.target.value === '' ? 0 : Number(e.target.value)})}
-                        />
-                      </div>
-                    </div>
-
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Date</label>
@@ -425,11 +449,85 @@ function AppContent() {
                           value={paymentData.payment_mode}
                           onChange={(e) => setPaymentData({...paymentData, payment_mode: e.target.value as any})}
                         >
+                          <option value="">Select Mode</option>
                           <option value="cash">Cash</option>
                           <option value="upi">UPI</option>
+                          <option value="both">Cash & UPI Both</option>
                         </select>
                       </div>
                     </div>
+
+                    {paymentData.payment_mode && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="space-y-4 overflow-hidden"
+                      >
+                        {paymentData.payment_mode === 'both' ? (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Cash Amount</label>
+                              <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
+                                <input 
+                                  required
+                                  type="number" 
+                                  placeholder="0"
+                                  className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white font-bold"
+                                  value={paymentData.cash_amount || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value === '' ? '' : Number(e.target.value);
+                                    const upi = Number(paymentData.upi_amount) || 0;
+                                    setPaymentData({
+                                      ...paymentData, 
+                                      cash_amount: val,
+                                      amount: (Number(val) || 0) + upi
+                                    });
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">UPI Amount</label>
+                              <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
+                                <input 
+                                  required
+                                  type="number" 
+                                  placeholder="0"
+                                  className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white font-bold"
+                                  value={paymentData.upi_amount || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value === '' ? '' : Number(e.target.value);
+                                    const cash = Number(paymentData.cash_amount) || 0;
+                                    setPaymentData({
+                                      ...paymentData, 
+                                      upi_amount: val,
+                                      amount: (Number(val) || 0) + cash
+                                    });
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Amount Received</label>
+                            <div className="relative">
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
+                              <input 
+                                required
+                                type="number" 
+                                placeholder="0"
+                                className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white font-bold text-lg"
+                                value={paymentData.amount || ''}
+                                onChange={(e) => setPaymentData({...paymentData, amount: e.target.value === '' ? '' : Number(e.target.value)})}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
 
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Notes</label>
@@ -437,10 +535,135 @@ function AppContent() {
                         rows={2}
                         placeholder="Optional notes..."
                         className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white text-sm resize-none"
-                        value={paymentData.notes}
+                        value={paymentData.notes || ''}
                         onChange={(e) => setPaymentData({...paymentData, notes: e.target.value})}
                       />
                     </div>
+
+                    {/* Pending Invoices Section */}
+                    {paymentData.customer_id && pendingInvoices.length > 0 && (
+                      <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setShowPendingInvoices(!showPendingInvoices)}
+                          className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <FileText size={18} className="text-slate-400" />
+                            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Pending Invoices</span>
+                            <span className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold rounded-full">
+                              {pendingInvoices.length}
+                            </span>
+                          </div>
+                          {showPendingInvoices ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                        </button>
+
+                        <AnimatePresence>
+                          {showPendingInvoices && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="p-4 space-y-3 max-h-[300px] overflow-y-auto bg-white dark:bg-slate-900">
+                                <div className="flex items-center justify-between mb-2">
+                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                    Settled: <span className="text-emerald-600 dark:text-emerald-400">₹{Object.values(selectedInvoices).reduce((a: number, b: any) => a + (Number(b) || 0), 0)}</span> / ₹{paymentData.amount || 0}
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const total = Number(paymentData.amount) || 0;
+                                      let remaining = total;
+                                      const newSelected: {[key: number]: number} = {};
+                                      
+                                      pendingInvoices.forEach(inv => {
+                                        if (remaining <= 0) return;
+                                        const due = inv.total_amount - (inv.amount_paid || 0);
+                                        const settle = Math.min(remaining, due);
+                                        newSelected[inv.id] = settle;
+                                        remaining -= settle;
+                                      });
+                                      setSelectedInvoices(newSelected);
+                                    }}
+                                    className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                                  >
+                                    Auto-Settle
+                                  </button>
+                                </div>
+
+                                {pendingInvoices.map((inv) => {
+                                  const due = inv.total_amount - (inv.amount_paid || 0);
+                                  const isSelected = selectedInvoices[inv.id] !== undefined;
+                                  
+                                  return (
+                                    <div 
+                                      key={inv.id}
+                                      className={cn(
+                                        "p-3 rounded-xl border transition-all",
+                                        isSelected 
+                                          ? "border-indigo-200 bg-indigo-50/30 dark:border-indigo-900/50 dark:bg-indigo-900/10" 
+                                          : "border-slate-100 dark:border-slate-800"
+                                      )}
+                                    >
+                                      <div className="flex items-start gap-3">
+                                        <input 
+                                          type="checkbox"
+                                          className="mt-1 w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                          checked={isSelected}
+                                          onChange={(e) => {
+                                            if (e.target.checked) {
+                                              const total = Number(paymentData.amount) || 0;
+                                              const currentSettled = Object.entries(selectedInvoices)
+                                                .filter(([id]) => Number(id) !== inv.id)
+                                                .reduce((sum: number, [_, amt]: [string, any]) => sum + (Number(amt) || 0), 0);
+                                              const remaining = Math.max(0, total - currentSettled);
+                                              const settle = Math.min(remaining, due);
+                                              setSelectedInvoices({...selectedInvoices, [inv.id]: settle});
+                                            } else {
+                                              const newSelected = {...selectedInvoices};
+                                              delete newSelected[inv.id];
+                                              setSelectedInvoices(newSelected);
+                                            }
+                                          }}
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center justify-between mb-1">
+                                            <span className="text-xs font-bold text-slate-900 dark:text-white">#{inv.invoice_number}</span>
+                                            <span className="text-xs font-bold text-slate-900 dark:text-white">₹{inv.total_amount}</span>
+                                          </div>
+                                          <div className="flex items-center justify-between">
+                                            <span className="text-[10px] text-slate-500 dark:text-slate-400">{new Date(inv.created_at).toLocaleDateString()}</span>
+                                            <span className="text-[10px] font-bold text-rose-500">₹{due} Pending</span>
+                                          </div>
+                                          
+                                          {isSelected && (
+                                            <div className="mt-2 flex items-center gap-2">
+                                              <span className="text-[10px] font-bold text-slate-400 uppercase">Settling:</span>
+                                              <input 
+                                                type="number"
+                                                className="flex-1 px-2 py-1 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-800 rounded text-xs font-bold text-indigo-600 dark:text-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                                value={selectedInvoices[inv.id]}
+                                                max={due}
+                                                onChange={(e) => {
+                                                  const val = Math.min(due, Math.max(0, Number(e.target.value)));
+                                                  setSelectedInvoices({...selectedInvoices, [inv.id]: val});
+                                                }}
+                                              />
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )}
 
                     <div className="flex gap-3 pt-4">
                       <button

@@ -68,7 +68,9 @@ export default function CreateInvoice() {
   const [discount, setDiscount] = useState(0);
   const [amountPaid, setAmountPaid] = useState<number | ''>('');
   const [paymentStatus, setPaymentStatus] = useState<'paid' | 'unpaid' | 'partial'>('paid');
-  const [paymentMode, setPaymentMode] = useState<'cash' | 'upi'>('cash');
+  const [paymentMode, setPaymentMode] = useState<'cash' | 'upi' | 'both' | ''>('');
+  const [cashAmount, setCashAmount] = useState<number | ''>('');
+  const [upiAmount, setUpiAmount] = useState<number | ''>('');
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -265,6 +267,8 @@ Thank you for your business!`;
         total_amount: totalAmount,
         payment_status: paymentStatus,
         payment_mode: paymentMode,
+        cash_amount: paymentMode === 'both' ? Number(cashAmount) || 0 : undefined,
+        upi_amount: paymentMode === 'both' ? Number(upiAmount) || 0 : undefined,
         created_at: invoiceDate,
         amount_paid: Number(amountPaid) || 0
       };
@@ -484,7 +488,7 @@ Thank you for your business!`;
                         required
                         type="text" 
                         className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none dark:text-white"
-                        value={newCustomer.name}
+                        value={newCustomer.name || ''}
                         onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})}
                       />
                     </div>
@@ -493,7 +497,7 @@ Thank you for your business!`;
                       <input 
                         type="text" 
                         className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none dark:text-white"
-                        value={newCustomer.phone}
+                        value={newCustomer.phone || ''}
                         onChange={(e) => setNewCustomer({...newCustomer, phone: e.target.value})}
                       />
                     </div>
@@ -552,7 +556,7 @@ Thank you for your business!`;
                           required
                           type="text" 
                           className="w-full px-4 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 dark:text-white font-bold transition-all"
-                          value={newProduct.name}
+                          value={newProduct.name || ''}
                           onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
                         />
                       </div>
@@ -561,7 +565,7 @@ Thank you for your business!`;
                         <input 
                           type="text" 
                           className="w-full px-4 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 dark:text-white font-bold transition-all"
-                          value={newProduct.category}
+                          value={newProduct.category || ''}
                           onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
                         />
                       </div>
@@ -570,7 +574,7 @@ Thank you for your business!`;
                         <input 
                           type="text" 
                           className="w-full px-4 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 dark:text-white font-bold transition-all"
-                          value={newProduct.sku}
+                          value={newProduct.sku || ''}
                           onChange={(e) => setNewProduct({...newProduct, sku: e.target.value})}
                         />
                       </div>
@@ -844,66 +848,131 @@ Thank you for your business!`;
 
             <div className="space-y-6 mb-10">
               <div className="space-y-3">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Payment Received</label>
-                <div className="relative group">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 font-black text-lg">₹</span>
-                  <input 
-                    type="number" 
-                    placeholder="0.00"
-                    className="w-full pl-10 pr-4 py-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-black text-xl text-indigo-600 dark:text-indigo-400 transition-all placeholder:text-slate-300"
-                    value={amountPaid || ''}
-                    onChange={(e) => {
-                      const val = e.target.value === '' ? '' : Number(e.target.value);
-                      setAmountPaid(val);
-                      const numericVal = Number(val) || 0;
-                      if (numericVal === 0) setPaymentStatus('unpaid');
-                      else if (numericVal >= totalAmount) setPaymentStatus('paid');
-                      else setPaymentStatus('partial');
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Payment Status</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {['paid', 'unpaid', 'partial'].map(status => (
-                    <button 
-                      key={status}
-                      onClick={() => setPaymentStatus(status as any)}
-                      className={cn(
-                        "py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all",
-                        paymentStatus === status 
-                          ? "bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100 dark:shadow-indigo-900/20" 
-                          : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
-                      )}
-                    >
-                      {status}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Payment Mode</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {['cash', 'upi'].map(mode => (
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'cash', label: 'Cash', icon: Banknote },
+                    { id: 'upi', label: 'UPI', icon: Smartphone },
+                    { id: 'both', label: 'Both', icon: Calculator }
+                  ].map(mode => (
                     <button 
-                      key={mode}
-                      onClick={() => setPaymentMode(mode as any)}
+                      key={mode.id}
+                      onClick={() => {
+                        setPaymentMode(mode.id as any);
+                        if (mode.id !== 'both') {
+                          setCashAmount('');
+                          setUpiAmount('');
+                        }
+                      }}
                       className={cn(
-                        "py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-2",
-                        paymentMode === mode 
+                        "py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex flex-col items-center justify-center gap-1",
+                        paymentMode === mode.id 
                           ? "bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100 dark:shadow-indigo-900/20" 
                           : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
                       )}
                     >
-                      {mode === 'cash' ? <Banknote size={14} /> : <Smartphone size={14} />}
-                      {mode}
+                      <mode.icon size={14} />
+                      {mode.label}
                     </button>
                   ))}
                 </div>
               </div>
+
+              {paymentMode && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="space-y-6 overflow-hidden"
+                >
+                  {paymentMode === 'both' ? (
+                    <div className="grid grid-cols-1 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Cash Amount</label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
+                          <input 
+                            type="number" 
+                            placeholder="0.00"
+                            className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-500/10 outline-none dark:text-white font-bold"
+                            value={cashAmount}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? '' : Number(e.target.value);
+                              setCashAmount(val);
+                              const total = (Number(val) || 0) + (Number(upiAmount) || 0);
+                              setAmountPaid(total);
+                              if (total === 0) setPaymentStatus('unpaid');
+                              else if (total >= totalAmount) setPaymentStatus('paid');
+                              else setPaymentStatus('partial');
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">UPI Amount</label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
+                          <input 
+                            type="number" 
+                            placeholder="0.00"
+                            className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-500/10 outline-none dark:text-white font-bold"
+                            value={upiAmount}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? '' : Number(e.target.value);
+                              setUpiAmount(val);
+                              const total = (Number(val) || 0) + (Number(cashAmount) || 0);
+                              setAmountPaid(total);
+                              if (total === 0) setPaymentStatus('unpaid');
+                              else if (total >= totalAmount) setPaymentStatus('paid');
+                              else setPaymentStatus('partial');
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Payment Received</label>
+                      <div className="relative group">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 font-black text-lg">₹</span>
+                        <input 
+                          type="number" 
+                          placeholder="0.00"
+                          className="w-full pl-10 pr-4 py-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-black text-xl text-indigo-600 dark:text-indigo-400 transition-all placeholder:text-slate-300"
+                          value={amountPaid || ''}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? '' : Number(e.target.value);
+                            setAmountPaid(val);
+                            const numericVal = Number(val) || 0;
+                            if (numericVal === 0) setPaymentStatus('unpaid');
+                            else if (numericVal >= totalAmount) setPaymentStatus('paid');
+                            else setPaymentStatus('partial');
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Payment Status</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['paid', 'unpaid', 'partial'].map(status => (
+                        <button 
+                          key={status}
+                          onClick={() => setPaymentStatus(status as any)}
+                          className={cn(
+                            "py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all",
+                            paymentStatus === status 
+                              ? "bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100 dark:shadow-indigo-900/20" 
+                              : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
+                          )}
+                        >
+                          {status}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
             </div>
 
             <button 

@@ -236,8 +236,13 @@ export default function CreateInvoice() {
     const businessId = savedInvoiceData.business_id || user?.id;
     const pngUrl = `${supabaseUrl}/storage/v1/object/public/invoices/${businessId}/Invoice_${savedInvoiceData.invoice_number}.png`;
     
+    if (!savedInvoiceData?.customer_phone) {
+      alert('Customer phone number is missing. Cannot share via WhatsApp.');
+      return;
+    }
+
     const message = `*Invoice: ${savedInvoiceData.invoice_number}*
-Hello ${savedInvoiceData.customer_name},
+Hello ${savedInvoiceData.customer_name || 'Customer'},
 
 Please find your invoice details below:
 *Amount:* ${formatCurrency(savedInvoiceData.total_amount)}
@@ -253,13 +258,12 @@ Thank you for your business!`;
   };
 
   const handleSave = async () => {
-    if (!selectedCustomerId) return alert('Please select a customer');
     if (lineItems.length === 0) return alert('Please add at least one item');
 
     setLoading(true);
     try {
       const invoiceData = {
-        customer_id: selectedCustomerId,
+        customer_id: selectedCustomerId || null,
         items: lineItems,
         subtotal,
         tax_amount: taxAmount,
@@ -352,7 +356,7 @@ Thank you for your business!`;
               className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm relative"
             >
               <div className="flex items-center justify-between mb-4">
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Customer *</label>
+                <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Customer (Optional)</label>
                 <button 
                   onClick={() => setIsQuickAddOpen(true)}
                   className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"

@@ -1039,7 +1039,7 @@ async function startServer() {
             await supabase.from('payments').insert([{
               business_id: req.businessId,
               invoice_id: invoiceId,
-              customer_id,
+              customer_id: customer_id || null,
               amount: cash,
               payment_mode: 'cash',
               payment_date: invoiceDate
@@ -1051,7 +1051,7 @@ async function startServer() {
             await supabase.from('payments').insert([{
               business_id: req.businessId,
               invoice_id: invoiceId,
-              customer_id,
+              customer_id: customer_id || null,
               amount: upi,
               payment_mode: 'upi',
               payment_date: invoiceDate
@@ -1062,7 +1062,7 @@ async function startServer() {
           await supabase.from('payments').insert([{
             business_id: req.businessId,
             invoice_id: invoiceId,
-            customer_id,
+            customer_id: customer_id || null,
             amount: paidAmount,
             payment_mode,
             payment_date: invoiceDate
@@ -1086,17 +1086,19 @@ async function startServer() {
       }
 
       // Update customer balance
-      try {
-        const { error: rpcError } = await supabase.rpc('update_customer_balance', {
-          c_id: customer_id,
-          amt: balanceToUpdate,
-          b_id: req.businessId
-        });
-        if (rpcError) throw rpcError;
-      } catch (e) {
-        const { data: cust } = await supabase.from('customers').select('outstanding_balance').eq('id', customer_id).single();
-        if (cust) {
-          await supabase.from('customers').update({ outstanding_balance: cust.outstanding_balance + balanceToUpdate }).eq('id', customer_id);
+      if (customer_id) {
+        try {
+          const { error: rpcError } = await supabase.rpc('update_customer_balance', {
+            c_id: customer_id,
+            amt: balanceToUpdate,
+            b_id: req.businessId
+          });
+          if (rpcError) throw rpcError;
+        } catch (e) {
+          const { data: cust } = await supabase.from('customers').select('outstanding_balance').eq('id', customer_id).single();
+          if (cust) {
+            await supabase.from('customers').update({ outstanding_balance: cust.outstanding_balance + balanceToUpdate }).eq('id', customer_id);
+          }
         }
       }
 
@@ -1176,12 +1178,14 @@ async function startServer() {
       const oldPaid = oldPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
       const oldBalance = oldInvoice.total_amount - oldPaid;
       
-      try {
-        const { error: rpcError } = await supabase.rpc('decrement_customer_balance', { c_id: oldInvoice.customer_id, amt: oldBalance, b_id: req.businessId });
-        if (rpcError) throw rpcError;
-      } catch (e) {
-        const { data: cust } = await supabase.from('customers').select('outstanding_balance').eq('id', oldInvoice.customer_id).single();
-        if (cust) await supabase.from('customers').update({ outstanding_balance: cust.outstanding_balance - oldBalance }).eq('id', oldInvoice.customer_id);
+      if (oldInvoice.customer_id) {
+        try {
+          const { error: rpcError } = await supabase.rpc('decrement_customer_balance', { c_id: oldInvoice.customer_id, amt: oldBalance, b_id: req.businessId });
+          if (rpcError) throw rpcError;
+        } catch (e) {
+          const { data: cust } = await supabase.from('customers').select('outstanding_balance').eq('id', oldInvoice.customer_id).single();
+          if (cust) await supabase.from('customers').update({ outstanding_balance: cust.outstanding_balance - oldBalance }).eq('id', oldInvoice.customer_id);
+        }
       }
 
       // Reverse account balance for each old payment
@@ -1251,7 +1255,7 @@ async function startServer() {
             await supabase.from('payments').insert([{
               business_id: req.businessId,
               invoice_id: req.params.id,
-              customer_id,
+              customer_id: customer_id || null,
               amount: cash,
               payment_mode: 'cash',
               payment_date: created_at
@@ -1263,7 +1267,7 @@ async function startServer() {
             await supabase.from('payments').insert([{
               business_id: req.businessId,
               invoice_id: req.params.id,
-              customer_id,
+              customer_id: customer_id || null,
               amount: upi,
               payment_mode: 'upi',
               payment_date: created_at
@@ -1274,7 +1278,7 @@ async function startServer() {
           await supabase.from('payments').insert([{
             business_id: req.businessId,
             invoice_id: req.params.id,
-            customer_id,
+            customer_id: customer_id || null,
             amount: paidAmount,
             payment_mode,
             payment_date: created_at
@@ -1293,12 +1297,14 @@ async function startServer() {
 
       // 5. Update customer balance for the NEW customer
       const balanceToUpdate = total_amount - paidAmount;
-      try {
-        const { error: rpcError } = await supabase.rpc('update_customer_balance', { c_id: customer_id, amt: balanceToUpdate, b_id: req.businessId });
-        if (rpcError) throw rpcError;
-      } catch (e) {
-        const { data: cust } = await supabase.from('customers').select('outstanding_balance').eq('id', customer_id).single();
-        if (cust) await supabase.from('customers').update({ outstanding_balance: cust.outstanding_balance + balanceToUpdate }).eq('id', customer_id);
+      if (customer_id) {
+        try {
+          const { error: rpcError } = await supabase.rpc('update_customer_balance', { c_id: customer_id, amt: balanceToUpdate, b_id: req.businessId });
+          if (rpcError) throw rpcError;
+        } catch (e) {
+          const { data: cust } = await supabase.from('customers').select('outstanding_balance').eq('id', customer_id).single();
+          if (cust) await supabase.from('customers').update({ outstanding_balance: cust.outstanding_balance + balanceToUpdate }).eq('id', customer_id);
+        }
       }
 
       res.json({ 

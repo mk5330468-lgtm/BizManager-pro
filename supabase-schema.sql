@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
   business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   invoice_number TEXT NOT NULL,
-  customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  customer_id BIGINT REFERENCES customers(id) ON DELETE CASCADE,
   subtotal DECIMAL NOT NULL,
   tax_amount DECIMAL NOT NULL,
   discount_amount DECIMAL DEFAULT 0,

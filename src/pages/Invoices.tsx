@@ -147,8 +147,13 @@ export default function Invoices() {
       // Construct the PNG URL (Predictable path used in invoiceFileService)
       const pngUrl = `${supabaseUrl}/storage/v1/object/public/invoices/${businessId}/Invoice_${invoice.invoice_number}.png`;
       
+      if (!invoice.customer_phone) {
+        alert('Customer phone number is missing. Cannot share via WhatsApp.');
+        return;
+      }
+
       const message = `*Invoice: ${invoice.invoice_number}*
-Hello ${invoice.customer_name},
+Hello ${invoice.customer_name || 'Customer'},
 
 Please find your invoice details below:
 *Amount:* ${formatCurrency(invoice.total_amount)}
@@ -331,7 +336,7 @@ Thank you for your business!`;
                         <span className="text-[10px] sm:text-sm font-bold text-slate-900 dark:text-white">#{invoice.invoice_number}</span>
                       </td>
                       <td className="px-3 sm:px-6 py-3 sm:py-4">
-                        <span className="text-[10px] sm:text-sm text-slate-600 dark:text-slate-300 font-medium truncate max-w-[80px] sm:max-w-none block">{invoice.customer_name}</span>
+                        <span className="text-[10px] sm:text-sm text-slate-600 dark:text-slate-300 font-medium truncate max-w-[80px] sm:max-w-none block">{invoice.customer_name || 'Walk-in Customer'}</span>
                       </td>
                       <td className="hidden md:table-cell px-3 sm:px-6 py-3 sm:py-4">
                         <span className="text-slate-500 dark:text-slate-400 text-[10px] sm:text-sm">{formatDate(invoice.created_at)}</span>

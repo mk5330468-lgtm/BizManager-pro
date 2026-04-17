@@ -136,16 +136,7 @@ export default function Invoices() {
 
   const shareOnWhatsApp = (invoice: Invoice) => {
     try {
-      // Use PNG URL instead of PDF as requested
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const businessId = invoice.business_id || user?.id;
-      
-      if (!businessId) {
-        throw new Error('Business ID missing');
-      }
-
-      // Construct the PNG URL (Predictable path used in invoiceFileService)
-      const pngUrl = `${supabaseUrl}/storage/v1/object/public/invoices/${businessId}/Invoice_${invoice.invoice_number}.png`;
+      const publicLink = `${window.location.origin}/public/invoice/${invoice.id}`;
       
       if (!invoice.customer_phone) {
         alert('Customer phone number is missing. Cannot share via WhatsApp.');
@@ -160,8 +151,8 @@ Please find your invoice details below:
 *Status:* ${invoice.payment_status?.toUpperCase() || 'N/A'}
 *Date:* ${formatDate(invoice.created_at)}
 
-You can view your invoice image here:
-${pngUrl}
+You can view and download your invoice here:
+${publicLink}
 
 Thank you for your business!`;
       

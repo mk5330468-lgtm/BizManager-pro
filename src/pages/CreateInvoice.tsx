@@ -94,8 +94,10 @@ export default function CreateInvoice() {
           setInvoiceDate(new Date(invoiceData.created_at).toISOString().split('T')[0]);
           setDiscount(invoiceData.discount_amount);
           setAmountPaid(invoiceData.amount_paid || 0);
-          setPaymentStatus(invoiceData.payment_status);
-          setPaymentMode(invoiceData.payment_mode);
+          setPaymentStatus(invoiceData.payment_status || 'unpaid');
+          setPaymentMode(invoiceData.payment_mode || ''); // Use empty string as fallback to prevent hidden fields
+          setCashAmount(invoiceData.cash_amount || '');
+          setUpiAmount(invoiceData.upi_amount || '');
 
           const items = await supabaseService.getInvoiceItems(invoiceId);
           const itemsData = items.map((item: any) => ({
@@ -225,6 +227,12 @@ export default function CreateInvoice() {
     ));
   };
 
+  const updatePrice = (index: number, price: number) => {
+    setLineItems(lineItems.map((item, i) => 
+      i === index ? { ...item, price: price, total: (item.quantity * price) - item.discount } : item
+    ));
+  };
+
   const subtotal = lineItems.reduce((sum, item) => sum + item.total, 0);
   const taxAmount = lineItems.reduce((sum, item) => sum + (item.total * item.tax_percentage / 100), 0);
   const totalAmount = subtotal + taxAmount - discount;
@@ -232,9 +240,7 @@ export default function CreateInvoice() {
   const handleShareWhatsApp = () => {
     if (!savedInvoiceData) return;
     
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const businessId = savedInvoiceData.business_id || user?.id;
-    const pngUrl = `${supabaseUrl}/storage/v1/object/public/invoices/${businessId}/Invoice_${savedInvoiceData.invoice_number}.png`;
+    const publicLink = `${window.location.origin}/public/invoice/${savedInvoiceData.id}`;
     
     if (!savedInvoiceData?.customer_phone) {
       alert('Customer phone number is missing. Cannot share via WhatsApp.');
@@ -249,8 +255,8 @@ Please find your invoice details below:
 *Status:* ${savedInvoiceData.payment_status?.toUpperCase() || 'N/A'}
 *Date:* ${new Date(savedInvoiceData.created_at).toLocaleDateString()}
 
-You can view your invoice image here:
-${pngUrl}
+You can view and download your invoice here:
+${publicLink}
 
 Thank you for your business!`;
 
@@ -262,6 +268,18 @@ Thank you for your business!`;
 
     setLoading(true);
     try {
+      const now = new Date();
+      const selectedDate = new Date(invoiceDate);
+      
+      // If the selected date is today, use the current precise time
+      // Otherwise use the selected date at midnight
+      let finalCreatedAt = invoiceDate;
+      if (selectedDate.toDateString() === now.toDateString()) {
+        finalCreatedAt = now.toISOString();
+      } else {
+        finalCreatedAt = new Date(selectedDate.setHours(0, 0, 0, 0)).toISOString();
+      }
+
       const invoiceData = {
         customer_id: selectedCustomerId || null,
         items: lineItems,
@@ -273,7 +291,7 @@ Thank you for your business!`;
         payment_mode: paymentMode,
         cash_amount: paymentMode === 'both' ? Number(cashAmount) || 0 : undefined,
         upi_amount: paymentMode === 'both' ? Number(upiAmount) || 0 : undefined,
-        created_at: invoiceDate,
+        created_at: finalCreatedAt,
         amount_paid: Number(amountPaid) || 0
       };
 
@@ -775,7 +793,18 @@ Thank you for your business!`;
                           </button>
                         </div>
                       </td>
-                      <td className="py-5 text-right font-bold text-slate-700 dark:text-slate-300">{formatCurrency(item.price)}</td>
+                      <td className="py-5 text-right">
+                        <div className="relative inline-block">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">₹</span>
+                          <input 
+                            type="number" 
+                            className="w-24 pl-5 pr-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-right text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none dark:text-white transition-all underline decoration-dotted decoration-slate-300 hover:decoration-indigo-500"
+                            placeholder="0"
+                            value={item.price || ''}
+                            onChange={(e) => updatePrice(index, e.target.value === '' ? 0 : Number(e.target.value))}
+                          />
+                        </div>
+                      </td>
                       <td className="py-5 text-right">
                         <div className="relative inline-block">
                           <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">₹</span>
@@ -862,10 +891,8 @@ Thank you for your business!`;
                     <button 
                       key={mode.id}
                       onClick={() => {
-                        setPaymentMode(mode.id as any);
-                        if (mode.id !== 'both') {
-                          setCashAmount('');
-                          setUpiAmount('');
+                        if (paymentMode !== mode.id) {
+                          setPaymentMode(mode.id as any);
                         }
                       }}
                       className={cn(
@@ -898,7 +925,7 @@ Thank you for your business!`;
                             type="number" 
                             placeholder="0.00"
                             className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-500/10 outline-none dark:text-white font-bold"
-                            value={cashAmount}
+                            value={cashAmount === 0 ? '0' : cashAmount}
                             onChange={(e) => {
                               const val = e.target.value === '' ? '' : Number(e.target.value);
                               setCashAmount(val);
@@ -919,7 +946,7 @@ Thank you for your business!`;
                             type="number" 
                             placeholder="0.00"
                             className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-500/10 outline-none dark:text-white font-bold"
-                            value={upiAmount}
+                            value={upiAmount === 0 ? '0' :upiAmount}
                             onChange={(e) => {
                               const val = e.target.value === '' ? '' : Number(e.target.value);
                               setUpiAmount(val);
@@ -942,7 +969,7 @@ Thank you for your business!`;
                           type="number" 
                           placeholder="0.00"
                           className="w-full pl-10 pr-4 py-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-black text-xl text-indigo-600 dark:text-indigo-400 transition-all placeholder:text-slate-300"
-                          value={amountPaid || ''}
+                          value={amountPaid === 0 ? '0' : amountPaid || ''}
                           onChange={(e) => {
                             const val = e.target.value === '' ? '' : Number(e.target.value);
                             setAmountPaid(val);

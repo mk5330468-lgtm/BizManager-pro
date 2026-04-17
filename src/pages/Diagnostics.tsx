@@ -265,11 +265,13 @@ CREATE TABLE IF NOT EXISTS invoices (
   id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
   business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   invoice_number TEXT NOT NULL,
-  customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  customer_id BIGINT REFERENCES customers(id) ON DELETE CASCADE,
   total_amount DECIMAL NOT NULL,
   amount_paid DECIMAL DEFAULT 0,
   payment_status TEXT CHECK(payment_status IN ('paid', 'unpaid', 'partial')),
   payment_mode TEXT CHECK(payment_mode IN ('cash', 'upi', 'both')),
+  cash_amount DECIMAL DEFAULT 0,
+  upi_amount DECIMAL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(business_id, invoice_number)
 );
@@ -297,7 +299,7 @@ CREATE TABLE IF NOT EXISTS accounts (
 CREATE TABLE IF NOT EXISTS profiles ( id UUID PRIMARY KEY, business_name TEXT NOT NULL, owner_name TEXT, email TEXT, phone TEXT UNIQUE, address TEXT, invoice_theme TEXT DEFAULT 'gst', created_at TIMESTAMPTZ DEFAULT NOW() );
 CREATE TABLE IF NOT EXISTS customers ( id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY, business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE, name TEXT NOT NULL, outstanding_balance DECIMAL DEFAULT 0, created_at TIMESTAMPTZ DEFAULT NOW() );
 CREATE TABLE IF NOT EXISTS products ( id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY, business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE, name TEXT NOT NULL, purchase_price DECIMAL NOT NULL, selling_price DECIMAL NOT NULL, stock_quantity INTEGER DEFAULT 0, low_stock_alert INTEGER DEFAULT 5, created_at TIMESTAMPTZ DEFAULT NOW() );
-CREATE TABLE IF NOT EXISTS invoices ( id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY, business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE, invoice_number TEXT NOT NULL, customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE, total_amount DECIMAL NOT NULL, payment_status TEXT CHECK(payment_status IN ('paid', 'unpaid', 'partial')), created_at TIMESTAMPTZ DEFAULT NOW(), UNIQUE(business_id, invoice_number) );
+CREATE TABLE IF NOT EXISTS invoices ( id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY, business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE, invoice_number TEXT NOT NULL, customer_id BIGINT REFERENCES customers(id) ON DELETE CASCADE, total_amount DECIMAL NOT NULL, payment_status TEXT CHECK(payment_status IN ('paid', 'unpaid', 'partial')), cash_amount DECIMAL DEFAULT 0, upi_amount DECIMAL DEFAULT 0, created_at TIMESTAMPTZ DEFAULT NOW(), UNIQUE(business_id, invoice_number) );
 CREATE TABLE IF NOT EXISTS payments ( id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY, business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE, invoice_id BIGINT REFERENCES invoices(id) ON DELETE CASCADE, amount DECIMAL NOT NULL, payment_mode TEXT, payment_date TIMESTAMPTZ DEFAULT NOW() );
 CREATE TABLE IF NOT EXISTS accounts ( id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY, business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE, name TEXT NOT NULL, balance DECIMAL DEFAULT 0, created_at TIMESTAMPTZ DEFAULT NOW() );`);
                 alert('SQL copied to clipboard!');

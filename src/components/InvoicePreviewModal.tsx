@@ -19,25 +19,52 @@ interface InvoicePreviewModalProps {
 export default function InvoicePreviewModal({ isOpen, onClose, invoice, onGoToDashboard }: InvoicePreviewModalProps) {
   const [business, setBusiness] = React.useState<any>(null);
 
+  const [scale, setScale] = React.useState(1);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
   React.useEffect(() => {
     if (isOpen) {
       supabaseService.getBusiness().then(setBusiness);
     }
   }, [isOpen]);
 
+  React.useEffect(() => {
+    const updateScale = () => {
+      if (containerRef.current && invoice) {
+        const parentWidth = containerRef.current.clientWidth;
+        const baseWidth = business?.invoice_theme === 'thermal' ? 280 : 794;
+        
+        // Target a width that leaves a bit of room
+        const targetWidth = parentWidth;
+        if (targetWidth < baseWidth) {
+          setScale(targetWidth / baseWidth);
+        } else {
+          // In the modal, we usually want it scaled down anyway to preview
+          const maxPreviewWidth = Math.min(parentWidth, 380); 
+          setScale(maxPreviewWidth / baseWidth);
+        }
+      }
+    };
+
+    if (isOpen) {
+      updateScale();
+      window.addEventListener('resize', updateScale);
+      const timer = setTimeout(updateScale, 300);
+      return () => {
+        window.removeEventListener('resize', updateScale);
+        clearTimeout(timer);
+      };
+    }
+  }, [isOpen, business, invoice]);
+
   if (!invoice) return null;
+
+  const baseWidth = business?.invoice_theme === 'thermal' ? 280 : 794;
+  const previewHeight = 450;
 
   const handleShareWhatsApp = () => {
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const businessId = invoice.business_id;
-      
-      if (!businessId) {
-        throw new Error('Business ID missing');
-      }
-
-      // Construct the PNG URL (Predictable path used in invoiceFileService)
-      const pngUrl = `${supabaseUrl}/storage/v1/object/public/invoices/${businessId}/Invoice_${invoice.invoice_number}.png`;
+      const publicLink = `${window.location.origin}/public/invoice/${invoice.id}`;
       
       const message = `*Invoice: ${invoice.invoice_number}*
 Hello ${invoice.customer_name},
@@ -47,8 +74,8 @@ Please find your invoice details below:
 *Status:* ${invoice.payment_status?.toUpperCase() || 'N/A'}
 *Date:* ${new Date(invoice.created_at).toLocaleDateString()}
 
-You can view your invoice image here:
-${pngUrl}
+You can view and download your invoice here:
+${publicLink}
 
 Thank you for your business!`;
       
@@ -110,20 +137,24 @@ Thank you for your business!`;
               </div>
 
               {/* Invoice Preview */}
-              <div className="mb-8 flex justify-center overflow-hidden">
+              <div ref={containerRef} className="mb-8 flex justify-center overflow-hidden">
                 <div 
                   id="invoice-preview-container"
-                  className={cn(
-                    "bg-white rounded-lg border border-slate-200 shadow-[0_10px_40px_rgba(0,0,0,0.1)] text-left relative origin-top",
-                    business?.invoice_theme === 'thermal' ? "w-[280px]" : "w-[794px]"
-                  )}
                   style={{
-                    transform: business?.invoice_theme === 'thermal' ? 'scale(1)' : 'scale(0.45)',
-                    height: business?.invoice_theme === 'thermal' ? 'auto' : '500px',
-                    marginBottom: business?.invoice_theme === 'thermal' ? '0' : '-250px'
+                    width: `${baseWidth * scale}px`,
+                    height: business?.invoice_theme === 'thermal' ? 'auto' : `${previewHeight}px`,
+                    overflow: 'hidden',
                   }}
-                  dangerouslySetInnerHTML={{ __html: getInvoiceHTML(invoice, business) }}
-                />
+                >
+                  <div 
+                    className="bg-white rounded-lg border border-slate-200 shadow-[0_10px_40px_rgba(0,0,0,0.1)] text-left origin-top-left"
+                    style={{
+                      width: `${baseWidth}px`,
+                      transform: `scale(${scale})`,
+                    }}
+                    dangerouslySetInnerHTML={{ __html: getInvoiceHTML(invoice, business) }}
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 gap-3">

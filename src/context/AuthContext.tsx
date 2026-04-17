@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { User } from '@supabase/supabase-js';
+import { clearAllCaches } from '../services/supabaseService';
 
 interface AuthContextType {
   user: User | null;
@@ -40,8 +41,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Listen for changes on auth state (logged in, signed out, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Clear all cached data and business ID when auth state changes
+      clearAllCaches();
+      
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Trigger a global data refresh for all mounted components
+      window.dispatchEvent(new CustomEvent('refresh-data'));
     });
 
     return () => subscription.unsubscribe();

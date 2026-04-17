@@ -12,6 +12,9 @@ export default function PublicInvoice() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [scale, setScale] = useState(1);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const fetchInvoice = async () => {
       try {
@@ -27,6 +30,34 @@ export default function PublicInvoice() {
     };
     fetchInvoice();
   }, [id]);
+
+  useEffect(() => {
+    const updateScale = () => {
+      if (containerRef.current && invoice) {
+        const parentWidth = containerRef.current.clientWidth;
+        const baseWidth = invoice.business?.invoice_theme === 'thermal' ? 280 : 794;
+        
+        if (parentWidth < baseWidth) {
+          setScale(parentWidth / baseWidth);
+        } else {
+          setScale(1);
+        }
+      }
+    };
+
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    // Extra check after potential layout shifts
+    const timer = setTimeout(updateScale, 300);
+    
+    return () => {
+      window.removeEventListener('resize', updateScale);
+      clearTimeout(timer);
+    };
+  }, [invoice, loading]);
+
+  const baseWidth = invoice?.business?.invoice_theme === 'thermal' ? 280 : 794;
+  const baseHeight = invoice?.business?.invoice_theme === 'thermal' ? 600 : 1123; // Adjusted thermal height estimate
 
   if (loading) {
     return (
@@ -125,12 +156,24 @@ export default function PublicInvoice() {
           </div>
 
           {/* Rendered Invoice Template */}
-          <div className="p-4 sm:p-8 overflow-x-auto no-scrollbar">
+          <div ref={containerRef} className="p-4 sm:p-8 overflow-hidden flex flex-col items-center">
             <div 
-              className="mx-auto bg-white text-slate-900"
-              style={{ width: invoice.business?.invoice_theme === 'thermal' ? '280px' : '100%', minWidth: invoice.business?.invoice_theme === 'thermal' ? '280px' : 'auto' }}
-              dangerouslySetInnerHTML={{ __html: getInvoiceHTML(invoice, invoice.business) }}
-            />
+              style={{ 
+                width: `${baseWidth * scale}px`,
+                height: `auto`,
+                minHeight: scale < 1 ? 'auto' : `${baseHeight}px`,
+                overflow: 'hidden'
+              }}
+            >
+              <div 
+                className="bg-white text-slate-900 origin-top-left shadow-[0_10px_40px_rgba(0,0,0,0.1)]"
+                style={{ 
+                  width: `${baseWidth}px`,
+                  transform: `scale(${scale})`,
+                }}
+                dangerouslySetInnerHTML={{ __html: getInvoiceHTML(invoice, invoice.business) }}
+              />
+            </div>
           </div>
         </motion.div>
 

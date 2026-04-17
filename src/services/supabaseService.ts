@@ -3,17 +3,32 @@ import { safeJson } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 
 let cachedBusinessId: string | null = null;
+let cachedSession: any = null;
+let lastSessionFetch = 0;
+const SESSION_CACHE_TTL = 300000; // 5 minutes
+
+// Initialize session listener immediately
+supabase.auth.onAuthStateChange((_event, session) => {
+  cachedSession = session;
+  cachedBusinessId = session?.user?.id || null;
+  lastSessionFetch = Date.now();
+  if (_event === 'SIGNED_OUT') {
+    clearAllCaches();
+  }
+});
 
 const getBusinessId = async () => {
   if (cachedBusinessId && cachedBusinessId !== 'null') return cachedBusinessId;
+  
+  if (cachedSession?.user?.id) {
+    cachedBusinessId = cachedSession.user.id;
+    return cachedBusinessId;
+  }
+
   try {
-    const sessionPromise = supabase.auth.getSession();
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Session timeout')), 10000)
-    );
-    const { data } = await Promise.race([sessionPromise, timeoutPromise]) as any;
-    const id = data.session?.user?.id;
-    cachedBusinessId = id && id !== 'null' ? id : null;
+    const { data: { session } } = await supabase.auth.getSession();
+    cachedSession = session;
+    cachedBusinessId = session?.user?.id || null;
     return cachedBusinessId;
   } catch (error) {
     console.warn('Could not get business ID:', error);
@@ -22,7 +37,7 @@ const getBusinessId = async () => {
 };
 
 const cache = new Map<string, { data: any, timestamp: number }>();
-const CACHE_TTL = 300000; // 5 minutes
+const CACHE_TTL = 600000; // Increased to 10 minutes for snappiness
 
 const getCacheKey = (url: string, options: RequestInit) => {
   return `${options.method || 'GET'}:${url}`;
@@ -32,19 +47,34 @@ const clearCache = () => {
   cache.clear();
 };
 
-let cachedSession: any = null;
-let lastSessionFetch = 0;
-const SESSION_CACHE_TTL = 300000; // 5 minutes
+export const clearAllCaches = () => {
+  cache.clear();
+  cachedBusinessId = null;
+  cachedSession = null;
+  lastSessionFetch = 0;
+};
 
 const fetchWithBusinessId = async (url: string, options: RequestInit = {}) => {
   const method = options.method || 'GET';
   const isGet = method === 'GET';
   const cacheKey = getCacheKey(url, options);
 
-  // Check cache for GET requests
+  // Check cache for GET requests - Implements SWR (Stale-While-Revalidate)
   if (isGet) {
     const cached = cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      // Return cached version immediately but trigger background validation
+      // if it's older than 30 seconds
+      if (Date.now() - cached.timestamp > 30000) {
+        setTimeout(() => {
+          fetch(url, { ...options, headers: constructHeaders(cachedSession, url, options) })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+              if (data) cache.set(cacheKey, { data, timestamp: Date.now() });
+            })
+            .catch(() => {});
+        }, 100);
+      }
       return {
         ok: true,
         json: async () => cached.data,
@@ -56,48 +86,24 @@ const fetchWithBusinessId = async (url: string, options: RequestInit = {}) => {
       } as any;
     }
   } else {
-    // Clear cache on mutations
+    // Clear cache on mutations to ensure fresh data
     clearCache();
   }
 
-  let session = cachedSession;
-  if (!session || Date.now() - lastSessionFetch > SESSION_CACHE_TTL) {
-    try {
-      const sessionPromise = supabase.auth.getSession();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Session timeout')), 10000)
-      );
-      const { data } = await Promise.race([sessionPromise, timeoutPromise]) as any;
-      session = data.session;
-      cachedSession = session;
-      lastSessionFetch = Date.now();
-      const id = session?.user?.id;
-      if (id && id !== 'null') {
-        cachedBusinessId = id;
-        console.log('Supabase session fetched, businessId:', cachedBusinessId);
-      } else {
-        console.warn('Supabase session fetched but no valid user ID found');
-      }
-    } catch (error) {
-      console.warn('Could not get supabase session:', error);
-    }
+  // Ensure we have a session
+  if (!cachedSession || Date.now() - lastSessionFetch > SESSION_CACHE_TTL) {
+    const { data: { session } } = await supabase.auth.getSession();
+    cachedSession = session;
+    lastSessionFetch = Date.now();
   }
 
-  const businessId = session?.user?.id;
-  const accessToken = session?.access_token;
-  
-  const headers: Record<string, string> = {
-    ...((options.headers as Record<string, string>) || {}),
-  };
-
-  if (businessId && businessId !== 'null') {
-    headers['x-business-id'] = businessId;
-  } else {
-    console.warn(`No valid businessId for request to ${url}`);
-  }
-
-  if (accessToken) {
-    headers['Authorization'] = `Bearer ${accessToken}`;
+  const headers = constructHeaders(cachedSession, url, options);
+  if (headers === null) {
+     return {
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'Business ID required' }),
+    } as any;
   }
 
   try {
@@ -106,16 +112,13 @@ const fetchWithBusinessId = async (url: string, options: RequestInit = {}) => {
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
       const errorMessage = errorData.error || errorData.message || `Request failed with status ${res.status}`;
-      console.error(`API error for ${url}:`, errorMessage, errorData);
       throw new Error(errorMessage);
     }
 
-    // Cache successful GET responses
     if (isGet) {
       const data = await res.clone().json();
       cache.set(cacheKey, { data, timestamp: Date.now() });
     } else {
-      // Dispatch global refresh event after successful mutation
       window.dispatchEvent(new CustomEvent('refresh-data'));
     }
     
@@ -124,6 +127,27 @@ const fetchWithBusinessId = async (url: string, options: RequestInit = {}) => {
     console.error(`Fetch error for ${url}:`, error.message || error);
     throw error;
   }
+};
+
+const constructHeaders = (session: any, url: string, options: RequestInit) => {
+  const businessId = session?.user?.id;
+  const accessToken = session?.access_token;
+  
+  const headers: Record<string, string> = {
+    ...((options.headers as Record<string, string>) || {}),
+  };
+
+  if (businessId && businessId !== 'null' && businessId !== 'undefined') {
+    headers['x-business-id'] = businessId;
+  } else if (url.startsWith('/api') && !url.startsWith('/api/public/') && url !== '/api/health') {
+    return null;
+  }
+
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+  
+  return headers;
 };
 
 export const supabaseService = {
@@ -143,6 +167,14 @@ export const supabaseService = {
       body: JSON.stringify(updates)
     });
     if (!res.ok) throw new Error('Failed to update business');
+  },
+
+  async syncAccounts() {
+    const res = await fetchWithBusinessId('/api/accounts/sync', {
+      method: 'POST'
+    });
+    if (!res.ok) throw new Error('Failed to sync accounts');
+    return await safeJson(res);
   },
 
   // Products
@@ -511,5 +543,22 @@ export const supabaseService = {
     const res = await fetchWithBusinessId('/api/storage/test-direct');
     if (!res.ok) throw new Error('Storage direct test failed');
     return await safeJson(res);
+  },
+
+  async deleteAccount() {
+    const id = await getBusinessId();
+    const res = await fetchWithBusinessId(`/api/business/${id}/account`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error('Failed to delete account');
+    return await safeJson(res);
+  },
+
+  prefetchAll() {
+    // Fire and forget prefetching of main data
+    this.getDashboardStats().catch(() => {});
+    this.getProducts().catch(() => {});
+    this.getCustomers().catch(() => {});
+    this.getBusiness().catch(() => {});
   }
 };

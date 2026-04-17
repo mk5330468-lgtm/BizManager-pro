@@ -11,7 +11,8 @@ import {
   Banknote,
   PlusCircle,
   ShoppingCart,
-  FileText
+  FileText,
+  RefreshCw
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -60,6 +61,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [showTodayModal, setShowTodayModal] = useState(false);
   const [showMonthlyModal, setShowMonthlyModal] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -84,6 +86,21 @@ export default function Dashboard() {
     window.addEventListener('refresh-data', handleRefresh);
     return () => window.removeEventListener('refresh-data', handleRefresh);
   }, []);
+
+  const handleSyncBalances = async () => {
+    setIsSyncing(true);
+    try {
+      await supabaseService.syncAccounts();
+      const statsData = await supabaseService.getDashboardStats();
+      setStats(statsData as any);
+      alert('Balances synchronized successfully!');
+    } catch (err: any) {
+      console.error('Error syncing balances:', err);
+      alert('Failed to sync balances: ' + err.message);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   if (loading) return <div className="flex items-center justify-center h-64">Loading...</div>;
 
@@ -360,7 +377,20 @@ export default function Dashboard() {
         >
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">Account Balances</h3>
-            <Wallet size={20} className="text-slate-400" />
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleSyncBalances}
+                disabled={isSyncing}
+                title="Synchronize Balances"
+                className={cn(
+                  "p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-slate-400 hover:text-indigo-600",
+                  isSyncing && "animate-spin text-indigo-600"
+                )}
+              >
+                <RefreshCw size={18} />
+              </button>
+              <Wallet size={20} className="text-slate-400" />
+            </div>
           </div>
           <div className="space-y-4">
             {stats?.accounts.map(account => {

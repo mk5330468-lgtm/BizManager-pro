@@ -94,6 +94,8 @@ CREATE TABLE IF NOT EXISTS invoices (
   amount_paid DECIMAL DEFAULT 0,
   payment_status TEXT CHECK(payment_status IN ('paid', 'unpaid', 'partial')),
   payment_mode TEXT CHECK(payment_mode IN ('cash', 'upi', 'both')),
+  cash_amount DECIMAL DEFAULT 0,
+  upi_amount DECIMAL DEFAULT 0,
   pdf_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(business_id, invoice_number)

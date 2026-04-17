@@ -202,20 +202,89 @@ async function startServer() {
     });
   });
 
+
+  app.post("/api/accounts/sync", async (req: any, res) => {
+    try {
+      const { businessId } = req;
+      
+      // 1. Get all financial records
+      const { data: payments } = await supabase.from('payments').select('amount, payment_mode').eq('business_id', businessId);
+      const { data: purchases } = await supabase.from('purchases').select('amount_paid, payment_mode').eq('business_id', businessId);
+      const { data: expenses } = await supabase.from('expenses').select('amount, payment_mode').eq('business_id', businessId);
+      
+      const balances: Record<string, number> = {
+        'cash': 0,
+        'upi': 0
+      };
+
+      // Sum payments (income)
+      payments?.forEach(p => {
+        if (p.payment_mode && balances.hasOwnProperty(p.payment_mode)) {
+          balances[p.payment_mode] += Number(p.amount) || 0;
+        }
+      });
+
+      // Subtract purchases (expense)
+      purchases?.forEach(p => {
+        if (p.payment_mode && balances.hasOwnProperty(p.payment_mode)) {
+          balances[p.payment_mode] -= Number(p.amount_paid) || 0;
+        }
+      });
+
+      // Subtract expenses (expense)
+      expenses?.forEach(e => {
+        if (e.payment_mode && balances.hasOwnProperty(e.payment_mode)) {
+          balances[e.payment_mode] -= Number(e.amount) || 0;
+        }
+      });
+
+      // 2. Update accounts table
+      for (const [name, balance] of Object.entries(balances)) {
+        await supabase
+          .from('accounts')
+          .update({ balance, last_updated: new Date().toISOString() })
+          .eq('business_id', businessId)
+          .eq('name', name);
+      }
+
+      res.json({ success: true, balances });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-  // Middleware to set business ID
-  app.use((req: any, res, next) => {
+  // Middleware to set and validate business ID for protected API routes
+  app.use("/api", (req: any, res, next) => {
+    // Skip for open/public API routes
+    if (req.path === '/health' || req.path.startsWith('/public/')) {
+      return next();
+    }
+
     const headerId = req.headers['x-business-id'];
+    
     // In Supabase migration, businessId is the user's UUID
     // Ensure we don't treat the string "null" or "undefined" as a valid UUID
     if (headerId && headerId !== 'null' && headerId !== 'undefined') {
-      req.businessId = headerId;
-    } else {
-      req.businessId = null;
+      // Basic UUID validation
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(headerId);
+      if (isUUID) {
+        req.businessId = headerId;
+        return next();
+      }
     }
-    next();
+    
+    // If we reach here, no valid business ID was found
+    req.businessId = null;
+    
+    // Return early for routes that strictly require business ID
+    // We'll allow it specifically for health and public routes (checked above)
+    return res.status(400).json({ 
+      error: "Business ID required", 
+      message: "A valid business UUID must be provided in the x-business-id header."
+    });
   });
 
   // Function to ensure default accounts exist (can be called from specific routes)
@@ -285,10 +354,7 @@ async function startServer() {
     const debugLogs: string[] = [];
     try {
       const { businessId } = req;
-      if (!businessId) {
-        return res.status(400).json({ error: "Business ID required" });
-      }
-
+      
       debugLogs.push(`Fetching stats for businessId: ${businessId}`);
       console.log(`[GET /api/dashboard/stats] ${debugLogs[debugLogs.length-1]}`);
 
@@ -988,6 +1054,8 @@ async function startServer() {
           payment_status,
           payment_mode,
           amount_paid: amount_paid || 0,
+          cash_amount: cash_amount || 0,
+          upi_amount: upi_amount || 0,
           created_at: invoiceDate,
           pdf_url: pdf_url || null
         }])
@@ -1044,7 +1112,14 @@ async function startServer() {
               payment_mode: 'cash',
               payment_date: invoiceDate
             }]);
-            await supabase.rpc('increment_account_balance', { b_id: req.businessId, acc_name: 'cash', amt: cash });
+            
+            try {
+              const { error: rpcError } = await supabase.rpc('increment_account_balance', { b_id: req.businessId, acc_name: 'cash', amt: cash });
+              if (rpcError) throw rpcError;
+            } catch (e) {
+              const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', 'cash').single();
+              if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + cash, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', 'cash');
+            }
           }
 
           if (upi > 0) {
@@ -1056,7 +1131,14 @@ async function startServer() {
               payment_mode: 'upi',
               payment_date: invoiceDate
             }]);
-            await supabase.rpc('increment_account_balance', { b_id: req.businessId, acc_name: 'upi', amt: upi });
+            
+            try {
+              const { error: rpcError } = await supabase.rpc('increment_account_balance', { b_id: req.businessId, acc_name: 'upi', amt: upi });
+              if (rpcError) throw rpcError;
+            } catch (e) {
+              const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', 'upi').single();
+              if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + upi, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', 'upi');
+            }
           }
         } else {
           await supabase.from('payments').insert([{
@@ -1079,7 +1161,7 @@ async function startServer() {
           } catch (e) {
             const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', payment_mode).single();
             if (acc) {
-              await supabase.from('accounts').update({ balance: acc.balance + paidAmount, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', payment_mode);
+              await supabase.from('accounts').update({ balance: Number(acc.balance) + paidAmount, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', payment_mode);
             }
           }
         }
@@ -1097,7 +1179,7 @@ async function startServer() {
         } catch (e) {
           const { data: cust } = await supabase.from('customers').select('outstanding_balance').eq('id', customer_id).single();
           if (cust) {
-            await supabase.from('customers').update({ outstanding_balance: cust.outstanding_balance + balanceToUpdate }).eq('id', customer_id);
+            await supabase.from('customers').update({ outstanding_balance: Number(cust.outstanding_balance) + balanceToUpdate }).eq('id', customer_id);
           }
         }
       }
@@ -1184,7 +1266,7 @@ async function startServer() {
           if (rpcError) throw rpcError;
         } catch (e) {
           const { data: cust } = await supabase.from('customers').select('outstanding_balance').eq('id', oldInvoice.customer_id).single();
-          if (cust) await supabase.from('customers').update({ outstanding_balance: cust.outstanding_balance - oldBalance }).eq('id', oldInvoice.customer_id);
+          if (cust) await supabase.from('customers').update({ outstanding_balance: Number(cust.outstanding_balance) - oldBalance }).eq('id', oldInvoice.customer_id);
         }
       }
 
@@ -1195,7 +1277,7 @@ async function startServer() {
             await supabase.rpc('decrement_account_balance', { b_id: req.businessId, acc_name: p.payment_mode, amt: p.amount });
           } catch (e) {
             const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', p.payment_mode).single();
-            if (acc) await supabase.from('accounts').update({ balance: acc.balance - p.amount, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', p.payment_mode);
+            if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - p.amount, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', p.payment_mode);
           }
         }
       }
@@ -1212,6 +1294,8 @@ async function startServer() {
           payment_status,
           payment_mode,
           amount_paid: amount_paid || 0,
+          cash_amount: cash_amount || 0,
+          upi_amount: upi_amount || 0,
           created_at,
           pdf_url: pdf_url || null
         })
@@ -1260,7 +1344,14 @@ async function startServer() {
               payment_mode: 'cash',
               payment_date: created_at
             }]);
-            await supabase.rpc('increment_account_balance', { b_id: req.businessId, acc_name: 'cash', amt: cash });
+            
+            try {
+              const { error: rpcError } = await supabase.rpc('increment_account_balance', { b_id: req.businessId, acc_name: 'cash', amt: cash });
+              if (rpcError) throw rpcError;
+            } catch (e) {
+              const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', 'cash').single();
+              if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + cash, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', 'cash');
+            }
           }
 
           if (upi > 0) {
@@ -1272,7 +1363,14 @@ async function startServer() {
               payment_mode: 'upi',
               payment_date: created_at
             }]);
-            await supabase.rpc('increment_account_balance', { b_id: req.businessId, acc_name: 'upi', amt: upi });
+            
+            try {
+              const { error: rpcError } = await supabase.rpc('increment_account_balance', { b_id: req.businessId, acc_name: 'upi', amt: upi });
+              if (rpcError) throw rpcError;
+            } catch (e) {
+              const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', 'upi').single();
+              if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + upi, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', 'upi');
+            }
           }
         } else {
           await supabase.from('payments').insert([{
@@ -1290,7 +1388,7 @@ async function startServer() {
             if (rpcError) throw rpcError;
           } catch (e) {
             const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', payment_mode).single();
-            if (acc) await supabase.from('accounts').update({ balance: acc.balance + paidAmount, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', payment_mode);
+            if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + paidAmount, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', payment_mode);
           }
         }
       }
@@ -1303,7 +1401,7 @@ async function startServer() {
           if (rpcError) throw rpcError;
         } catch (e) {
           const { data: cust } = await supabase.from('customers').select('outstanding_balance').eq('id', customer_id).single();
-          if (cust) await supabase.from('customers').update({ outstanding_balance: cust.outstanding_balance + balanceToUpdate }).eq('id', customer_id);
+          if (cust) await supabase.from('customers').update({ outstanding_balance: Number(cust.outstanding_balance) + balanceToUpdate }).eq('id', customer_id);
         }
       }
 
@@ -1382,24 +1480,31 @@ async function startServer() {
       
       const paid = payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
       const balance = invoice.total_amount - paid;
-      if (balance > 0) {
+      if (balance > 0 && invoice.customer_id) {
         try {
           const { error: rpcError } = await supabase.rpc('decrement_customer_balance', { c_id: invoice.customer_id, amt: balance, b_id: req.businessId });
           if (rpcError) throw rpcError;
         } catch (e) {
           const { data: cust } = await supabase.from('customers').select('outstanding_balance').eq('id', invoice.customer_id).single();
-          if (cust) await supabase.from('customers').update({ outstanding_balance: cust.outstanding_balance - balance }).eq('id', invoice.customer_id);
+          if (cust) await supabase.from('customers').update({ outstanding_balance: Number(cust.outstanding_balance) - balance }).eq('id', invoice.customer_id);
         }
       }
 
-      // Reverse account balance
-      if (paid > 0) {
-        try {
-          const { error: rpcError } = await supabase.rpc('decrement_account_balance', { b_id: req.businessId, acc_name: invoice.payment_mode, amt: paid });
-          if (rpcError) throw rpcError;
-        } catch (e) {
-          const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', invoice.payment_mode).single();
-          if (acc) await supabase.from('accounts').update({ balance: acc.balance - paid, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', invoice.payment_mode);
+      // Reverse account balance for each payment
+      const { data: allPayments } = await supabase
+        .from('payments')
+        .select('amount, payment_mode')
+        .eq('invoice_id', req.params.id);
+
+      if (allPayments && allPayments.length > 0) {
+        for (const p of allPayments) {
+          try {
+            const { error: rpcError } = await supabase.rpc('decrement_account_balance', { b_id: req.businessId, acc_name: p.payment_mode, amt: p.amount });
+            if (rpcError) throw rpcError;
+          } catch (e) {
+            const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', p.payment_mode).single();
+            if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - p.amount, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', p.payment_mode);
+          }
         }
       }
 
@@ -1573,7 +1678,7 @@ async function startServer() {
         } catch (e) {
           const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', payment_mode).single();
           if (acc) {
-            await supabase.from('accounts').update({ balance: acc.balance - paidAmount, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', payment_mode);
+            await supabase.from('accounts').update({ balance: Number(acc.balance) - paidAmount, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', payment_mode);
           }
         }
       }
@@ -1637,7 +1742,7 @@ async function startServer() {
         } catch (e) {
           const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', businessId).eq('name', purchase.payment_mode).single();
           if (acc) {
-            await supabase.from('accounts').update({ balance: acc.balance + paidAmount, last_updated: new Date().toISOString() }).eq('business_id', businessId).eq('name', purchase.payment_mode);
+            await supabase.from('accounts').update({ balance: Number(acc.balance) + paidAmount, last_updated: new Date().toISOString() }).eq('business_id', businessId).eq('name', purchase.payment_mode);
           }
         }
       }
@@ -1722,7 +1827,7 @@ async function startServer() {
         } catch (e) {
           const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', businessId).eq('name', oldPurchase.payment_mode).single();
           if (acc) {
-            await supabase.from('accounts').update({ balance: acc.balance + oldPaidAmount, last_updated: new Date().toISOString() }).eq('business_id', businessId).eq('name', oldPurchase.payment_mode);
+            await supabase.from('accounts').update({ balance: Number(acc.balance) + oldPaidAmount, last_updated: new Date().toISOString() }).eq('business_id', businessId).eq('name', oldPurchase.payment_mode);
           }
         }
       }
@@ -1794,7 +1899,7 @@ async function startServer() {
         } catch (e) {
           const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', businessId).eq('name', payment_mode).single();
           if (acc) {
-            await supabase.from('accounts').update({ balance: acc.balance - newPaidAmount, last_updated: new Date().toISOString() }).eq('business_id', businessId).eq('name', payment_mode);
+            await supabase.from('accounts').update({ balance: Number(acc.balance) - newPaidAmount, last_updated: new Date().toISOString() }).eq('business_id', businessId).eq('name', payment_mode);
           }
         }
       }
@@ -1860,7 +1965,7 @@ async function startServer() {
         if (rpcError) throw rpcError;
       } catch (e) {
         const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', businessId).eq('name', payment.payment_mode).single();
-        if (acc) await supabase.from('accounts').update({ balance: acc.balance - payment.amount, last_updated: new Date().toISOString() }).eq('business_id', businessId).eq('name', payment.payment_mode);
+        if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - payment.amount, last_updated: new Date().toISOString() }).eq('business_id', businessId).eq('name', payment.payment_mode);
       }
 
       // 3. Reverse customer balance
@@ -1874,7 +1979,7 @@ async function startServer() {
           if (rpcError) throw rpcError;
         } catch (e) {
           const { data: cust } = await supabase.from('customers').select('outstanding_balance').eq('id', payment.customer_id).single();
-          if (cust) await supabase.from('customers').update({ outstanding_balance: cust.outstanding_balance + payment.amount }).eq('id', payment.customer_id);
+          if (cust) await supabase.from('customers').update({ outstanding_balance: Number(cust.outstanding_balance) + payment.amount }).eq('id', payment.customer_id);
         }
       }
 
@@ -1927,7 +2032,7 @@ async function startServer() {
         if (rpcError) throw rpcError;
       } catch (e) {
         const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', businessId).eq('name', oldPayment.payment_mode).single();
-        if (acc) await supabase.from('accounts').update({ balance: acc.balance - oldPayment.amount, last_updated: new Date().toISOString() }).eq('business_id', businessId).eq('name', oldPayment.payment_mode);
+        if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - oldPayment.amount, last_updated: new Date().toISOString() }).eq('business_id', businessId).eq('name', oldPayment.payment_mode);
       }
 
       try {
@@ -1935,7 +2040,7 @@ async function startServer() {
         if (rpcError) throw rpcError;
       } catch (e) {
         const { data: cust } = await supabase.from('customers').select('outstanding_balance').eq('id', oldPayment.customer_id).single();
-        if (cust) await supabase.from('customers').update({ outstanding_balance: cust.outstanding_balance + oldPayment.amount }).eq('id', oldPayment.customer_id);
+        if (cust) await supabase.from('customers').update({ outstanding_balance: Number(cust.outstanding_balance) + oldPayment.amount }).eq('id', oldPayment.customer_id);
       }
 
       // 3. Apply new values
@@ -1944,7 +2049,7 @@ async function startServer() {
         if (rpcError) throw rpcError;
       } catch (e) {
         const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', businessId).eq('name', payment_mode).single();
-        if (acc) await supabase.from('accounts').update({ balance: acc.balance + amount, last_updated: new Date().toISOString() }).eq('business_id', businessId).eq('name', payment_mode);
+        if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + amount, last_updated: new Date().toISOString() }).eq('business_id', businessId).eq('name', payment_mode);
       }
 
       try {
@@ -1952,7 +2057,7 @@ async function startServer() {
         if (rpcError) throw rpcError;
       } catch (e) {
         const { data: cust } = await supabase.from('customers').select('outstanding_balance').eq('id', oldPayment.customer_id).single();
-        if (cust) await supabase.from('customers').update({ outstanding_balance: cust.outstanding_balance - amount }).eq('id', oldPayment.customer_id);
+        if (cust) await supabase.from('customers').update({ outstanding_balance: Number(cust.outstanding_balance) - amount }).eq('id', oldPayment.customer_id);
       }
 
       // 4. Update payment record
@@ -2258,7 +2363,8 @@ async function startServer() {
   });
 
   app.get("/api/business", async (req: any, res) => {
-    const id = req.query.id || req.businessId;
+    // Prefer businessId from header/middleware, fallback to query for public/admin if needed
+    const id = req.businessId || req.query.id;
     if (!id) return res.status(400).json({ error: "Business ID required" });
 
     // Validate UUID format
@@ -2355,6 +2461,39 @@ async function startServer() {
         details: error.details,
         hint: "If you see RLS errors, ensure SUPABASE_SERVICE_ROLE_KEY is set in your environment variables. Check the server logs for 'Supabase Initialization Debug' to verify the key is loaded."
       });
+    }
+  });
+
+  app.delete("/api/business/:id/account", async (req: any, res) => {
+    const { id } = req.params;
+    if (id !== req.businessId) return res.status(403).json({ error: "Unauthorized" });
+
+    try {
+      // 1. Delete the profile (this should cascade if using the provided schema)
+      // We use the active Supabase client which has service role if configured
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', id);
+
+      if (profileError) throw profileError;
+
+      // 2. Also try to clean up other tables just in case cascade is missing
+      const tables = ['customers', 'products', 'invoices', 'purchases', 'expenses', 'accounts', 'payments'];
+      for (const table of tables) {
+        await supabase.from(table).delete().eq('business_id', id).catch(() => {});
+      }
+
+      // 3. Attempt to delete the auth user (requires service role)
+      if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        const { error: authError } = await supabase.auth.admin.deleteUser(id);
+        if (authError) console.warn("Auth deletion failed:", authError.message);
+      }
+
+      res.json({ success: true, message: "Account and all associated data deleted successfully." });
+    } catch (error: any) {
+      console.error("[DELETE /api/business/:id/account] Error:", error);
+      res.status(500).json({ error: error.message });
     }
   });
 
@@ -2562,7 +2701,7 @@ async function startServer() {
       } catch (e) {
         const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', payment_mode).single();
         if (acc) {
-          await supabase.from('accounts').update({ balance: acc.balance - amount, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', payment_mode);
+          await supabase.from('accounts').update({ balance: Number(acc.balance) - amount, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', payment_mode);
         }
       }
 
@@ -2594,7 +2733,7 @@ async function startServer() {
         if (account) {
           await supabase
             .from('accounts')
-            .update({ balance: (account.balance || 0) + expense.amount })
+            .update({ balance: Number(account.balance || 0) + expense.amount })
             .eq('business_id', req.businessId)
             .eq('name', expense.payment_mode);
         }
@@ -2717,10 +2856,6 @@ async function startServer() {
   app.get("/api/reports/detailed-product-profit", async (req: any, res) => {
     const { month } = req.query;
     const businessId = req.businessId;
-
-    if (!businessId) {
-      return res.status(400).json({ error: "Business ID required" });
-    }
 
     try {
       let query = supabase

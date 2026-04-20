@@ -27,7 +27,7 @@ const StatCard = ({ title, value, icon: Icon, color, trend, onClick }: { title: 
     animate={{ opacity: 1, y: 0 }}
     onClick={onClick}
     className={cn(
-      "bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm transition-all",
+      "bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm transition-all",
       onClick ? "cursor-pointer hover:shadow-lg hover:border-indigo-200 dark:hover:border-indigo-900 active:scale-95" : "hover:shadow-md"
     )}
   >
@@ -116,7 +116,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {error && (
         <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 p-4 rounded-xl flex flex-col gap-3 text-rose-700 dark:text-rose-400">
           <div className="flex items-center gap-3">
@@ -164,8 +164,8 @@ export default function Dashboard() {
         </Link>
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-        <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="space-y-3">
           <StatCard 
             title="Today's Sales" 
             value={formatCurrency(stats?.todaySales || 0)} 
@@ -173,13 +173,13 @@ export default function Dashboard() {
             color="bg-indigo-600" 
             onClick={() => setShowTodayModal(true)}
           />
-          <div className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-900/30 flex justify-between items-center">
+          <div className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-900/30 flex justify-between items-center">
             <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Today's Pay-in</span>
             <span className="text-sm font-black text-indigo-900 dark:text-indigo-200">{formatCurrency(stats?.todayCollections || 0)}</span>
           </div>
         </div>
         
-        <div className="space-y-4">
+        <div className="space-y-3">
           <StatCard 
             title="Monthly Sale" 
             value={formatCurrency(stats?.monthlySales || 0)} 
@@ -187,7 +187,7 @@ export default function Dashboard() {
             color="bg-emerald-600" 
             onClick={() => setShowMonthlyModal(true)}
           />
-          <div className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-100 dark:border-emerald-900/30 flex justify-between items-center">
+          <div className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-900/30 flex justify-between items-center">
             <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Monthly Pay-in</span>
             <span className="text-sm font-black text-emerald-900 dark:text-emerald-200">{formatCurrency(stats?.monthlyCollections || 0)}</span>
           </div>
@@ -373,15 +373,15 @@ export default function Dashboard() {
         )}
       </AnimatePresence>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Account Balances */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
-          className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm"
+          className="lg:col-span-1 bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm"
         >
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">Account Balances</h3>
             <div className="flex items-center gap-2">
               <button 
@@ -398,7 +398,7 @@ export default function Dashboard() {
               <Wallet size={20} className="text-slate-400" />
             </div>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {stats?.accounts.map(account => {
               const Icon = paymentIcons[account.name] || Wallet;
               const color = accountColors[account.name] || 'bg-slate-600';
@@ -407,21 +407,21 @@ export default function Dashboard() {
                   key={account.id}
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 transition-all hover:shadow-md"
+                  className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 transition-all hover:shadow-md"
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-3">
-                      <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm", color)}>
-                        <Icon size={20} />
+                      <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm", color)}>
+                        <Icon size={16} />
                       </div>
-                      <span className="font-bold text-slate-900 dark:text-white capitalize">{account.name === 'cash' ? 'Cash in Hand' : account.name.toUpperCase()}</span>
+                      <span className="font-bold text-slate-900 dark:text-white capitalize text-sm">{account.name === 'cash' ? 'Cash in Hand' : account.name.toUpperCase()}</span>
                     </div>
                   </div>
                   <div className="flex items-end justify-between">
                     <div>
                       <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">Current Balance</p>
                       <p className={cn(
-                        "text-xl font-black",
+                        "text-lg font-black",
                         account.balance >= 0 ? "text-slate-900 dark:text-white" : "text-rose-600"
                       )}>
                         {formatCurrency(account.balance)}
@@ -439,15 +439,15 @@ export default function Dashboard() {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.3 }}
-          className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm"
+          className="lg:col-span-2 bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm"
         >
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">Pending Payments</h3>
             <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700">
               Top 5 Outstanding
             </span>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-3">
             <AnimatePresence mode="popLayout">
               {stats?.pendingCustomers && stats.pendingCustomers.length > 0 ? (
                 stats.pendingCustomers.map((customer) => (
@@ -457,21 +457,21 @@ export default function Dashboard() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="flex items-center justify-between p-4 rounded-2xl border border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 hover:bg-white dark:hover:bg-slate-800 hover:border-indigo-100 dark:hover:border-indigo-900 hover:shadow-sm transition-all group"
+                    className="flex items-center justify-between p-3 rounded-xl border border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 hover:bg-white dark:hover:bg-slate-800 hover:border-indigo-100 dark:hover:border-indigo-900 hover:shadow-sm transition-all group"
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold">
                         {customer.name.charAt(0)}
                       </div>
                       <div>
-                        <p className="font-bold text-slate-900 dark:text-white">{customer.name}</p>
+                        <p className="font-bold text-slate-900 dark:text-white text-sm">{customer.name}</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">{customer.phone || 'No phone'}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <p className="text-xs text-slate-400 dark:text-slate-500 uppercase font-bold tracking-wider">Due</p>
-                        <p className="font-bold text-rose-600 dark:text-rose-400">{formatCurrency(customer.outstanding_balance)}</p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold tracking-wider">Due</p>
+                        <p className="font-bold text-rose-600 dark:text-rose-400 text-sm">{formatCurrency(customer.outstanding_balance)}</p>
                       </div>
                       <button 
                         onClick={() => {
@@ -479,10 +479,10 @@ export default function Dashboard() {
                           const message = `Dear ${customer.name}, your payment of ${formatCurrency(customer.outstanding_balance)} is pending with BizManager Pro.\nPlease find your digital invoice details at ${appUrl}/invoices for your reference.\nWe request you to settle the balance via UPI or Cash at your earliest convenience.\nThank you for your continued business and support!`;
                           window.open(formatWhatsAppLink(customer.phone, message), '_blank');
                         }}
-                        className="p-2.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all shadow-sm"
+                        className="p-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all shadow-sm"
                         title="Send Reminder"
                       >
-                        <Smartphone size={18} />
+                        <Smartphone size={16} />
                       </button>
                     </div>
                   </motion.div>

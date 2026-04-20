@@ -52,13 +52,13 @@ import Login from './pages/Login';
 const SidebarItem = ({ icon: Icon, label, to, active, onClick }: { icon: any, label: string, to: string, active: boolean, onClick?: () => void, key?: string }) => (
   <Link to={to} onClick={onClick}>
     <div className={cn(
-      "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group",
+      "flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-all duration-200 group",
       active 
-        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-indigo-900/20" 
+        ? "bg-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-indigo-900/20" 
         : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
     )}>
-      <Icon size={20} className={cn(active ? "text-white" : "text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300")} />
-      <span className="font-medium">{label}</span>
+      <Icon size={18} className={cn(active ? "text-white" : "text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300")} />
+      <span className="font-medium text-sm">{label}</span>
     </div>
   </Link>
 );
@@ -93,7 +93,7 @@ const Sidebar = ({ isOpen, toggle, logout, business }: { isOpen: boolean, toggle
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={toggle}
-            className="fixed inset-0 bg-black/20 dark:bg-black/40 backdrop-blur-sm z-40 lg:hidden"
+            className="fixed inset-0 bg-black/20 dark:bg-black/40 backdrop-blur-sm z-40 xl:hidden"
           />
         )}
       </AnimatePresence>
@@ -101,26 +101,26 @@ const Sidebar = ({ isOpen, toggle, logout, business }: { isOpen: boolean, toggle
       {/* Sidebar */}
       <motion.aside
         initial={false}
-        animate={{ x: isOpen ? 0 : -300 }}
+        animate={{ x: isOpen ? 0 : -240 }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
         className={cn(
-          "fixed top-0 left-0 bottom-0 w-[280px] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 z-50 flex flex-col",
+          "fixed top-0 left-0 bottom-0 w-[240px] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 z-50 flex flex-col",
           !isOpen && "pointer-events-none"
         )}
       >
-        <div className="p-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200 dark:shadow-indigo-900/20">
-              <BarChart3 className="text-white" size={24} />
+        <div className="p-5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-200 dark:shadow-indigo-900/20">
+              <BarChart3 className="text-white" size={18} />
             </div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">BizManager <span className="text-indigo-600">Pro</span></h1>
+            <h1 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">BizManager <span className="text-indigo-600">Pro</span></h1>
           </div>
-          <button onClick={toggle} className="lg:hidden text-slate-500 dark:text-slate-400">
-            <X size={24} />
+          <button onClick={toggle} className="xl:hidden text-slate-500 dark:text-slate-400">
+            <X size={20} />
           </button>
         </div>
 
-        <div className="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
+        <div className="flex-1 px-3 py-1 space-y-0.5 overflow-y-auto">
           {menuItems.map((item) => (
             <SidebarItem 
               key={item.to} 
@@ -319,18 +319,18 @@ function AppContent() {
       
       <main className={cn(
         "flex-1 flex flex-col min-w-0 transition-all duration-200 ease-out relative z-10",
-        isSidebarOpen ? "lg:ml-[280px]" : "lg:ml-0"
+        isSidebarOpen ? "xl:ml-[240px]" : "xl:ml-0"
       )}>
         {/* Header */}
-        <header className="h-16 bg-white dark:bg-slate-900/80 dark:backdrop-blur-md border-b border-slate-200 dark:border-slate-800/50 flex items-center justify-between px-4 lg:px-8 sticky top-0 z-30 transition-colors duration-300">
-          <button onClick={toggleSidebar} className="lg:hidden p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
-            <Menu size={24} />
+        <header className="h-14 bg-white dark:bg-slate-900/80 dark:backdrop-blur-md border-b border-slate-200 dark:border-slate-800/50 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30 transition-colors duration-300">
+          <button onClick={toggleSidebar} className="xl:hidden p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+            <Menu size={22} />
           </button>
           
           <div className="flex-1 flex items-center px-4">
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <button 
               onClick={toggleTheme}
               className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
@@ -362,7 +362,7 @@ function AppContent() {
         </header>
 
         {/* Content */}
-        <div className="flex-1 p-4 lg:p-8 overflow-y-auto">
+        <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
             <AnimatePresence mode="wait">
               <motion.div

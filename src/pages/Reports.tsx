@@ -844,7 +844,6 @@ export default function Reports() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/50">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Date</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Type</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Customer</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Reference</th>
@@ -860,7 +859,7 @@ export default function Reports() {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                   >
-                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic">
+                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">
                       No transactions found for this month.
                     </td>
                   </motion.tr>
@@ -880,7 +879,7 @@ export default function Reports() {
                           animate={{ opacity: 1 }}
                           className="bg-slate-50/50 dark:bg-slate-800/30"
                         >
-                          <td colSpan={6} className="px-6 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-y border-slate-100 dark:border-slate-800">
+                          <td colSpan={5} className="px-6 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-y border-slate-100 dark:border-slate-800">
                             {date}
                           </td>
                         </motion.tr>
@@ -893,9 +892,6 @@ export default function Reports() {
                               exit={{ opacity: 0, scale: 0.95 }}
                               className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
                             >
-                              <td className="px-6 py-4 font-medium text-slate-400 dark:text-slate-500 whitespace-nowrap text-xs">
-                                {new Date(tx.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </td>
                               <td className="px-6 py-4">
                                 <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400">
                                   {tx.type}

@@ -34,14 +34,9 @@ export const getInvoiceHTML = (invoice: Invoice, business: any) => {
           <p style="font-weight: bold; margin: 0; letter-spacing: 2px;">TAX INVOICE</p>
         </div>
         
-        <div style="margin-bottom: 10px; display: flex; justify-content: space-between;">
-          <div>
-            <p style="margin: 2px 0;">No: ${invoice.invoice_number}</p>
-            <p style="margin: 2px 0;">Date: ${new Date(invoice.created_at).toLocaleDateString()}</p>
-          </div>
-          <div style="text-align: right;">
-            <p style="margin: 2px 0;">Time: ${new Date(invoice.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-          </div>
+        <div style="margin-bottom: 10px;">
+          <p style="margin: 2px 0;">No: ${invoice.invoice_number}</p>
+          <p style="margin: 2px 0;">Date: ${new Date(invoice.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
         </div>
 
         <div style="margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 5px;">
@@ -110,7 +105,7 @@ export const getInvoiceHTML = (invoice: Invoice, business: any) => {
             <h1 style="font-size: 48px; font-weight: 900; color: #0f172a; margin: 0; letter-spacing: -0.02em;">INVOICE</h1>
             <div style="margin-top: 10px; display: flex; gap: 20px;">
               <p style="color: #64748b; font-size: 14px;">Number: <span style="color: #0f172a; font-weight: 700;">#${invoice.invoice_number}</span></p>
-              <p style="color: #64748b; font-size: 14px;">Date: <span style="color: #0f172a; font-weight: 700;">${new Date(invoice.created_at).toLocaleDateString()}</span></p>
+              <p style="color: #64748b; font-size: 14px;">Date: <span style="color: #0f172a; font-weight: 700;">${new Date(invoice.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span></p>
             </div>
           </div>
           <div style="text-align: right; max-width: 300px;">

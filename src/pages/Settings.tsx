@@ -28,6 +28,8 @@ import { supabaseService } from '../services/supabaseService';
 import { useAuth } from '../context/AuthContext';
 import ConfirmModal from '../components/ConfirmModal';
 
+import { toast } from 'react-hot-toast';
+
 type Tab = 'profile' | 'invoice' | 'subscription' | 'backup';
 
 export default function Settings() {
@@ -36,6 +38,7 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState<Tab>((searchParams.get('tab') as Tab) || 'profile');
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
@@ -169,6 +172,24 @@ export default function Settings() {
       setLoading(false);
       setPendingImportFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setLoading(true);
+    try {
+      await supabaseService.deleteAccount();
+      toast.success('Account deleted successfully');
+      setIsDeleteModalOpen(false);
+      // Wait for toast to show before redirecting/logout
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 1500);
+    } catch (error: any) {
+      console.error('Delete account error:', error);
+      toast.error(error.message || 'Failed to delete account');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -664,6 +685,22 @@ export default function Settings() {
                           </label>
                         </div>
                       </div>
+
+                      <div className="mt-8 p-6 bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/20 rounded-2xl">
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+                          <div>
+                            <h4 className="font-bold text-rose-900 dark:text-rose-200">Danger Zone</h4>
+                            <p className="text-xs text-rose-700 dark:text-rose-300 mt-1">Permanently delete your account and all associated business data.</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setIsDeleteModalOpen(true)}
+                            className="bg-rose-600 hover:bg-rose-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-rose-100 dark:shadow-rose-900/20"
+                          >
+                            Delete Account
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -745,6 +782,17 @@ export default function Settings() {
         title="Import Backup"
         message="Warning: This will overwrite your current data for this business profile. Are you sure you want to proceed?"
         confirmText="Import & Overwrite"
+      />
+
+      <ConfirmModal 
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDeleteAccount}
+        loading={loading}
+        title="Permanently Delete Account?"
+        message="This action is irreversible. All your invoices, products, customers, and business settings will be permanently removed from our servers. Are you absolutely certain?"
+        confirmText="Yes, Delete Everything"
+        variant="danger"
       />
     </div>
   );

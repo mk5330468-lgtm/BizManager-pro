@@ -72,7 +72,7 @@ Hello ${invoice.customer_name},
 Please find your invoice details below:
 *Amount:* ${formatCurrency(invoice.total_amount)}
 *Status:* ${invoice.payment_status?.toUpperCase() || 'N/A'}
-*Date:* ${new Date(invoice.created_at).toLocaleDateString()}
+*Date:* ${new Date(invoice.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
 
 You can view and download your invoice here:
 ${publicLink}
@@ -126,9 +126,9 @@ Thank you for your business!`;
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-[32px] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800"
+            className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[32px] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800"
           >
-            <div className="p-8 text-center max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div className="p-4 sm:p-8 text-center max-h-[90vh] overflow-y-auto custom-scrollbar">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-black text-slate-900 dark:text-white">Invoice Preview</h3>
                 <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
@@ -137,12 +137,13 @@ Thank you for your business!`;
               </div>
 
               {/* Invoice Preview */}
-              <div ref={containerRef} className="mb-8 flex justify-center overflow-hidden">
+              <div ref={containerRef} className="mb-8 flex justify-center overflow-x-auto">
                 <div 
                   id="invoice-preview-container"
                   style={{
                     width: `${baseWidth * scale}px`,
-                    height: business?.invoice_theme === 'thermal' ? 'auto' : `${previewHeight}px`,
+                    height: business?.invoice_theme === 'thermal' ? 'auto' : `${previewHeight * scale}px`,
+                    minHeight: business?.invoice_theme === 'thermal' ? 'auto' : `${previewHeight * scale}px`,
                     overflow: 'hidden',
                   }}
                 >
@@ -150,6 +151,7 @@ Thank you for your business!`;
                     className="bg-white rounded-lg border border-slate-200 shadow-[0_10px_40px_rgba(0,0,0,0.1)] text-left origin-top-left"
                     style={{
                       width: `${baseWidth}px`,
+                      minHeight: business?.invoice_theme === 'thermal' ? 'auto' : `${previewHeight}px`,
                       transform: `scale(${scale})`,
                     }}
                     dangerouslySetInnerHTML={{ __html: getInvoiceHTML(invoice, business) }}
@@ -157,7 +159,7 @@ Thank you for your business!`;
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button 
                     onClick={handleDownloadPDF}
                     className="flex items-center justify-center gap-3 text-white py-4 rounded-2xl font-bold transition-all shadow-lg shadow-indigo-100 dark:shadow-indigo-900/20"

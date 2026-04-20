@@ -6,7 +6,26 @@ import { createClient } from "@supabase/supabase-js";
 import multer from "multer";
 import dotenv from "dotenv";
 import fs from "fs";
+import NodeCache from "node-cache";
 // import puppeteer from "puppeteer"; // Moved to dynamic import inside generateAndUploadInvoiceAssets
+
+// Initialize Cache - 5 minutes TTL
+const cache = new NodeCache({ stdTTL: 300, checkperiod: 120 });
+
+// Global Cache Invalidation Middleware for Data Changes
+const cacheInvalidator = (req: any, res: any, next: any) => {
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+    const originalJson = res.json;
+    res.json = function(data: any) {
+      if (res.statusCode >= 200 && res.statusCode < 300 && req.businessId) {
+        cache.del(`dashboard_stats_${req.businessId}`);
+        console.log(`[Cache] Invalidated dashboard stats for businessId: ${req.businessId} due to ${req.method} ${req.path}`);
+      }
+      return originalJson.call(this, data);
+    };
+  }
+  next();
+};
 
 console.log("-----------------------------------------");
 console.log("Environment Debugging:");
@@ -130,6 +149,15 @@ if (!supabaseUrl || !activeKey) {
     console.error("- Failed to initialize Supabase client:", initError.message);
   }
 }
+
+// Helper to get IST date from UTC timestamp for grouping
+const getISTDate = (utcDateStr: string | Date) => {
+  if (!utcDateStr) return '';
+  const date = new Date(utcDateStr);
+  // IST is UTC + 5:30
+  const istDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
+  return istDate.toISOString();
+};
 
 // Middleware to ensure Supabase is initialized
 const ensureSupabase = (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -287,22 +315,21 @@ async function startServer() {
     });
   });
 
+  // Apply Cache Invalidation Middleware
+  app.use("/api", cacheInvalidator);
+
   // Function to ensure default accounts exist (can be called from specific routes)
   const ensureDefaultAccounts = async (businessId: string) => {
     try {
       const accounts = ['cash', 'upi'];
       for (const accountName of accounts) {
-        const { data: exists } = await supabase
+        // Try to insert, if exists it will fail with 23505 (unique violation), which we ignore
+        const { error } = await supabase
           .from('accounts')
-          .select('id')
-          .eq('business_id', businessId)
-          .eq('name', accountName)
-          .single();
-
-        if (!exists) {
-          await supabase
-            .from('accounts')
-            .insert([{ business_id: businessId, name: accountName, balance: 0 }]);
+          .insert([{ business_id: businessId, name: accountName, balance: 0 }]);
+        
+        if (error && error.code !== '23505') {
+          console.warn(`[ensureDefaultAccounts] Note for ${accountName}: ${error.message}`);
         }
       }
     } catch (e) {
@@ -343,6 +370,37 @@ async function startServer() {
     }
   };
 
+  app.get("/api/search", async (req: any, res) => {
+    const { q } = req.query;
+    if (!q || q.length < 2) return res.json({ products: [], customers: [] });
+
+    try {
+      const businessId = req.businessId;
+      
+      const [productsRes, customersRes] = await Promise.all([
+        supabase
+          .from('products')
+          .select('id, name, selling_price, stock_quantity')
+          .eq('business_id', businessId)
+          .ilike('name', `%${q}%`)
+          .limit(5),
+        supabase
+          .from('customers')
+          .select('id, name, phone, outstanding_balance')
+          .eq('business_id', businessId)
+          .ilike('name', `%${q}%`)
+          .limit(5)
+      ]);
+
+      res.json({
+        products: productsRes.data || [],
+        customers: customersRes.data || []
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Call ensureBuckets on startup
   ensureBuckets();
 
@@ -355,8 +413,16 @@ async function startServer() {
     try {
       const { businessId } = req;
       
+      // Try cache first
+      const cacheKey = `dashboard_stats_${businessId}`;
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        console.log(`[GET /api/dashboard/stats] Cache HIT for businessId: ${businessId}`);
+        return res.json(cachedData);
+      }
+
+      console.log(`[GET /api/dashboard/stats] Cache MISS for businessId: ${businessId}`);
       debugLogs.push(`Fetching stats for businessId: ${businessId}`);
-      console.log(`[GET /api/dashboard/stats] ${debugLogs[debugLogs.length-1]}`);
 
       // Ensure default accounts exist
       try {
@@ -367,11 +433,21 @@ async function startServer() {
         console.error(`[GET /api/dashboard/stats] ${debugLogs[debugLogs.length-1]}`);
       }
 
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const getISTBoundaries = () => {
+        const istNow = new Date(new Date().getTime() + (5.5 * 60 * 60 * 1000));
+        const istYear = istNow.getUTCFullYear();
+        const istMonth = String(istNow.getUTCMonth() + 1).padStart(2, '0');
+        const istDay = String(istNow.getUTCDate()).padStart(2, '0');
+        
+        return {
+          todayStart: `${istYear}-${istMonth}-${istDay}T00:00:00+05:30`,
+          monthStart: `${istYear}-${istMonth}-01T00:00:00+05:30`
+        };
+      };
 
-      debugLogs.push(`Date ranges: todayStart=${todayStart}, monthStart=${monthStart}`);
+      const { todayStart, monthStart } = getISTBoundaries();
+
+      debugLogs.push(`Date ranges (IST): todayStart=${todayStart}, monthStart=${monthStart}`);
 
       const queries = [
         supabase.from('payments').select('amount, payment_mode, invoice_id').eq('business_id', businessId).gte('payment_date', todayStart),
@@ -469,8 +545,7 @@ async function startServer() {
         debugLogs.push(`Pending customers query failed: ${pendingError.message}`);
       }
 
-      debugLogs.push("Sending response");
-      res.json({
+      const resultData = {
         todaySales,
         todayCollections,
         todayInvoicesCount,
@@ -488,7 +563,13 @@ async function startServer() {
         lowStockCount,
         pendingCustomers: pendingCustomers || [],
         accounts: accountsData || []
-      });
+      };
+
+      // Set cache before sending
+      cache.set(cacheKey, resultData);
+
+      debugLogs.push("Sending response");
+      res.json(resultData);
     } catch (error: any) {
       console.error("Error fetching dashboard data:", error);
       res.status(500).json({ 
@@ -1271,13 +1352,40 @@ async function startServer() {
       }
 
       // Reverse account balance for each old payment
+      // If payment records are missing but invoice says amount was paid, try to reverse from invoice fields
       if (oldPayments && oldPayments.length > 0) {
         for (const p of oldPayments) {
           try {
-            await supabase.rpc('decrement_account_balance', { b_id: req.businessId, acc_name: p.payment_mode, amt: p.amount });
+            const { error: rpcError } = await supabase.rpc('decrement_account_balance', { b_id: req.businessId, acc_name: p.payment_mode, amt: p.amount });
+            if (rpcError) throw rpcError;
           } catch (e) {
             const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', p.payment_mode).single();
             if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - p.amount, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', p.payment_mode);
+          }
+        }
+      } else if (oldInvoice.amount_paid > 0 && oldInvoice.payment_mode) {
+        // Fallback reversal using invoice fields if payments records are missing
+        if (oldInvoice.payment_mode === 'both') {
+          const modes = ['cash', 'upi'] as const;
+          for (const mode of modes) {
+            const amt = mode === 'cash' ? (oldInvoice.cash_amount || 0) : (oldInvoice.upi_amount || 0);
+            if (amt > 0) {
+              try {
+                const { error: rpcError } = await supabase.rpc('decrement_account_balance', { b_id: req.businessId, acc_name: mode, amt });
+                if (rpcError) throw rpcError;
+              } catch (e) {
+                const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', mode).single();
+                if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - amt, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', mode);
+              }
+            }
+          }
+        } else {
+          try {
+            const { error: rpcError } = await supabase.rpc('decrement_account_balance', { b_id: req.businessId, acc_name: oldInvoice.payment_mode, amt: oldInvoice.amount_paid });
+            if (rpcError) throw rpcError;
+          } catch (e) {
+            const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', req.businessId).eq('name', oldInvoice.payment_mode).single();
+            if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - oldInvoice.amount_paid, last_updated: new Date().toISOString() }).eq('business_id', req.businessId).eq('name', oldInvoice.payment_mode);
           }
         }
       }
@@ -1716,11 +1824,12 @@ async function startServer() {
       if (items && items.length > 0) {
         for (const item of items) {
           try {
-            await supabase.rpc('decrement_stock', {
+            const { error: rpcError } = await supabase.rpc('decrement_stock', {
               p_id: item.product_id,
               qty: item.quantity,
               b_id: businessId
             });
+            if (rpcError) throw rpcError;
           } catch (e) {
             const { data: p } = await supabase.from('products').select('stock_quantity').eq('id', item.product_id).single();
             if (p) {
@@ -1734,11 +1843,12 @@ async function startServer() {
       const paidAmount = purchase.amount_paid || (purchase.total_amount - (purchase.balance_due || 0));
       if (purchase.payment_mode && paidAmount > 0) {
         try {
-          await supabase.rpc('increment_account_balance', {
+          const { error: rpcError } = await supabase.rpc('increment_account_balance', {
             b_id: businessId,
             acc_name: purchase.payment_mode,
             amt: paidAmount
           });
+          if (rpcError) throw rpcError;
         } catch (e) {
           const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', businessId).eq('name', purchase.payment_mode).single();
           if (acc) {
@@ -1801,11 +1911,12 @@ async function startServer() {
       if (oldItems && oldItems.length > 0) {
         for (const item of oldItems) {
           try {
-            await supabase.rpc('decrement_stock', {
+            const { error: rpcError } = await supabase.rpc('decrement_stock', {
               p_id: item.product_id,
               qty: item.quantity,
               b_id: businessId
             });
+            if (rpcError) throw rpcError;
           } catch (e) {
             const { data: p } = await supabase.from('products').select('stock_quantity').eq('id', item.product_id).single();
             if (p) {
@@ -1819,11 +1930,12 @@ async function startServer() {
       const oldPaidAmount = oldPurchase.amount_paid || (oldPurchase.total_amount - (oldPurchase.balance_due || 0));
       if (oldPurchase.payment_mode && oldPaidAmount > 0) {
         try {
-          await supabase.rpc('increment_account_balance', {
+          const { error: rpcError } = await supabase.rpc('increment_account_balance', {
             b_id: businessId,
             acc_name: oldPurchase.payment_mode,
             amt: oldPaidAmount
           });
+          if (rpcError) throw rpcError;
         } catch (e) {
           const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', businessId).eq('name', oldPurchase.payment_mode).single();
           if (acc) {
@@ -1873,11 +1985,12 @@ async function startServer() {
 
           // Apply new stock update
           try {
-            await supabase.rpc('increment_stock', {
+            const { error: rpcError } = await supabase.rpc('increment_stock', {
               p_id: item.product_id,
               qty: item.quantity,
               b_id: businessId
             });
+            if (rpcError) throw rpcError;
           } catch (e) {
             const { data: p } = await supabase.from('products').select('stock_quantity').eq('id', item.product_id).single();
             if (p) {
@@ -1891,11 +2004,12 @@ async function startServer() {
       const newPaidAmount = amount_paid !== undefined ? Number(amount_paid) : (payment_status === 'paid' ? total_amount : (total_amount - (balance_due || 0)));
       if (payment_mode && newPaidAmount > 0) {
         try {
-          await supabase.rpc('decrement_account_balance', {
+          const { error: rpcError } = await supabase.rpc('decrement_account_balance', {
             b_id: businessId,
             acc_name: payment_mode,
             amt: newPaidAmount
           });
+          if (rpcError) throw rpcError;
         } catch (e) {
           const { data: acc } = await supabase.from('accounts').select('balance').eq('business_id', businessId).eq('name', payment_mode).single();
           if (acc) {
@@ -2244,10 +2358,11 @@ async function startServer() {
     const { month } = req.query; // Format: YYYY-MM
     if (!month) return res.status(400).json({ error: "Month is required" });
 
-    const monthStart = `${month}-01T00:00:00Z`;
+    const monthStart = `${month}-01T00:00:00+05:30`;
     const nextMonthDate = new Date(month as string + '-01');
     nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
-    const monthEnd = nextMonthDate.toISOString();
+    const nextMonthStr = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}`;
+    const monthEnd = `${nextMonthStr}-01T00:00:00+05:30`;
 
     try {
       // 1. Sales (Payments received)
@@ -2429,15 +2544,8 @@ async function startServer() {
           }
 
           console.log(`[GET /api/business] Default profile created for ${id}. Initializing accounts...`);
-          // Initialize default accounts
-          const { error: accError } = await supabase.from('accounts').insert([
-            { business_id: id, name: 'cash', balance: 0 },
-            { business_id: id, name: 'upi', balance: 0 }
-          ]);
-          
-          if (accError) {
-            console.warn("[GET /api/business] Failed to initialize default accounts:", accError.message);
-          }
+          // Initialize default accounts using robust helper
+          await ensureDefaultAccounts(id);
           
           return res.json(newUser);
         }
@@ -2479,9 +2587,18 @@ async function startServer() {
       if (profileError) throw profileError;
 
       // 2. Also try to clean up other tables just in case cascade is missing
-      const tables = ['customers', 'products', 'invoices', 'purchases', 'expenses', 'accounts', 'payments'];
+      const tables = [
+        'customers', 'products', 'invoices', 'invoice_items', 
+        'purchases', 'purchase_items', 'expenses', 'accounts', 
+        'payments', 'quotations', 'quotation_items', 'payment_vouchers'
+      ];
       for (const table of tables) {
-        await supabase.from(table).delete().eq('business_id', id).catch(() => {});
+        try {
+          // Supabase query builder is thenable but might not have .catch() directly before execution
+          await supabase.from(table).delete().eq('business_id', id);
+        } catch (cleanupError) {
+          console.warn(`Manual cleanup for table ${table} failed:`, cleanupError);
+        }
       }
 
       // 3. Attempt to delete the auth user (requires service role)
@@ -2503,10 +2620,12 @@ async function startServer() {
     if (!month) return res.status(400).json({ error: "Month is required" });
 
     try {
-      const monthStart = `${month}-01T00:00:00Z`;
+      // Define boundaries in IST
+      const monthStart = `${month}-01T00:00:00+05:30`;
       const nextMonthDate = new Date(month as string + '-01');
       nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
-      const monthEnd = nextMonthDate.toISOString();
+      const nextMonthStr = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}`;
+      const monthEnd = `${nextMonthStr}-01T00:00:00+05:30`;
 
       // Current Month Data
       const { data: currentData } = await supabase
@@ -2519,8 +2638,8 @@ async function startServer() {
       // Calculate Previous Month
       const [year, monthNum] = (month as string).split('-').map(Number);
       const prevDate = new Date(year, monthNum - 2, 1);
-      const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
-      const prevMonthStart = `${prevMonth}-01T00:00:00Z`;
+      const prevMonthStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+      const prevMonthStart = `${prevMonthStr}-01T00:00:00+05:30`;
       const prevMonthEnd = monthStart;
 
       // Previous Month Data
@@ -2531,11 +2650,12 @@ async function startServer() {
         .gte('payment_date', prevMonthStart)
         .lt('payment_date', prevMonthEnd);
       
-      // Group by date
+      // Group by date (adjusted for IST)
       const groupData = (data: any[]) => {
         const groups: { [key: string]: number } = {};
         data.forEach(p => {
-          const date = p.payment_date.split('T')[0];
+          const istDate = getISTDate(p.payment_date);
+          const date = istDate.split('T')[0];
           groups[date] = (groups[date] || 0) + p.amount;
         });
         return Object.entries(groups).map(([date, total]) => ({ date, total })).sort((a, b) => a.date.localeCompare(b.date));
@@ -2544,9 +2664,10 @@ async function startServer() {
       res.json({
         current: groupData(currentData || []),
         previous: groupData(prevData || []),
-        prevMonthLabel: prevMonth
+        prevMonthLabel: prevMonthStr
       });
     } catch (error: any) {
+      console.error("Sales report error:", error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -2580,23 +2701,23 @@ async function startServer() {
 
       const monthlyData: Record<string, { total: number, collection: number }> = {};
       
-      // Initialize last 12 months
+      // Initialize last 12 months in IST
       for (let i = 0; i < 12; i++) {
-        const d = new Date();
-        d.setMonth(now.getMonth() - i);
+        const d = new Date(new Date().getTime() + (5.5 * 60 * 60 * 1000));
+        d.setUTCMonth(d.getUTCMonth() - i);
         const monthKey = d.toISOString().slice(0, 7); // YYYY-MM
         monthlyData[monthKey] = { total: 0, collection: 0 };
       }
 
       invoices?.forEach(inv => {
-        const monthKey = inv.created_at.slice(0, 7);
+        const monthKey = getISTDate(inv.created_at).slice(0, 7);
         if (monthlyData[monthKey] !== undefined) {
           monthlyData[monthKey].total += (inv.total_amount || 0);
         }
       });
 
       payments?.forEach(pay => {
-        const monthKey = pay.payment_date.slice(0, 7);
+        const monthKey = getISTDate(pay.payment_date).slice(0, 7);
         if (monthlyData[monthKey] !== undefined) {
           monthlyData[monthKey].collection += (pay.amount || 0);
         }
@@ -2621,10 +2742,11 @@ async function startServer() {
     if (!month) return res.status(400).json({ error: "Month is required" });
 
     try {
-      const monthStart = `${month}-01T00:00:00Z`;
+      const monthStart = `${month}-01T00:00:00+05:30`;
       const nextMonthDate = new Date(month as string + '-01');
       nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
-      const monthEnd = nextMonthDate.toISOString();
+      const nextMonthStr = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}`;
+      const monthEnd = `${nextMonthStr}-01T00:00:00+05:30`;
 
       const { data: payments, error } = await supabase
         .from('payments')
@@ -2645,12 +2767,13 @@ async function startServer() {
         reference: p.invoices?.invoice_number || 'Direct',
         customer_name: p.customers?.name || 'General / Walk-in',
         amount: p.amount,
-        date: p.payment_date,
+        date: getISTDate(p.payment_date),
         status: p.payment_mode
       })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       res.json(formatted);
     } catch (error: any) {
+      console.error("Detailed transactions report error:", error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -2806,18 +2929,21 @@ async function startServer() {
       const monthlySales: { [key: string]: number } = {};
       
       invoices?.forEach(inv => {
-        const m = inv.created_at.substring(0, 7);
+        const istDate = getISTDate(inv.created_at);
+        const m = istDate.substring(0, 7); // YYYY-MM
         monthlySales[m] = (monthlySales[m] || 0) + inv.total_amount;
       });
 
       // Add payments that are not linked to invoices or linked to invoices from previous months
       payments?.forEach(p => {
-        const m = p.payment_date.substring(0, 7);
+        const istDate = getISTDate(p.payment_date);
+        const m = istDate.substring(0, 7); // YYYY-MM
         if (!p.invoice_id) {
           monthlySales[m] = (monthlySales[m] || 0) + p.amount;
         } else {
           const inv = invoices?.find(i => i.id === p.invoice_id);
-          if (inv && inv.created_at.substring(0, 7) < m) {
+          const invM = inv ? getISTDate(inv.created_at).substring(0, 7) : null;
+          if (inv && invM && invM < m) {
             monthlySales[m] = (monthlySales[m] || 0) + p.amount;
           }
         }
@@ -2868,13 +2994,14 @@ async function startServer() {
         .eq('business_id', businessId);
 
       if (month) {
-        const startOfMonth = `${month}-01T00:00:00Z`;
+        const monthStart = `${month}-01T00:00:00+05:30`;
         const nextMonthDate = new Date(month + '-01');
         nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
-        const endOfMonth = nextMonthDate.toISOString();
+        const nextMonthStr = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}`;
+        const monthEnd = `${nextMonthStr}-01T00:00:00+05:30`;
         
-        query = query.gte('invoices.created_at', startOfMonth)
-                     .lt('invoices.created_at', endOfMonth);
+        query = query.gte('invoices.created_at', monthStart)
+                     .lt('invoices.created_at', monthEnd);
       }
 
       const { data: items, error } = await query;
@@ -2896,7 +3023,7 @@ async function startServer() {
         const totalProfit = profitPerUnit * quantity;
 
         return {
-          date: inv?.created_at,
+          date: getISTDate(inv?.created_at),
           product_name: prod?.name,
           quantity: quantity,
           selling_price_after_discount: sellingPriceAfterDiscount,
@@ -2921,10 +3048,11 @@ async function startServer() {
 
   app.get("/api/reports/monthly-invoices/:month", async (req: any, res) => {
     const { month } = req.params; // Format: YYYY-MM
-    const monthStart = `${month}-01T00:00:00Z`;
+    const monthStart = `${month}-01T00:00:00+05:30`;
     const nextMonthDate = new Date(month + '-01');
     nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
-    const monthEnd = nextMonthDate.toISOString();
+    const nextMonthStr = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}`;
+    const monthEnd = `${nextMonthStr}-01T00:00:00+05:30`;
 
     try {
       const { data, error } = await supabase

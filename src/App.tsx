@@ -31,6 +31,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { supabase } from './lib/supabase';
 import { supabaseService } from './services/supabaseService';
 
+import { Toaster } from 'react-hot-toast';
+
 // Pages
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
@@ -706,6 +708,7 @@ export default function App() {
   return (
     <Router>
       <AuthProvider>
+        <Toaster position="top-right" />
         <AppContent />
       </AuthProvider>
     </Router>

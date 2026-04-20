@@ -253,7 +253,7 @@ Hello ${savedInvoiceData.customer_name || 'Customer'},
 Please find your invoice details below:
 *Amount:* ${formatCurrency(savedInvoiceData.total_amount)}
 *Status:* ${savedInvoiceData.payment_status?.toUpperCase() || 'N/A'}
-*Date:* ${new Date(savedInvoiceData.created_at).toLocaleDateString()}
+*Date:* ${new Date(savedInvoiceData.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
 
 You can view and download your invoice here:
 ${publicLink}

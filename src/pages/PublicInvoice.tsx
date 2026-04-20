@@ -33,8 +33,8 @@ export default function PublicInvoice() {
 
   useEffect(() => {
     const updateScale = () => {
-      if (containerRef.current && invoice) {
-        const parentWidth = containerRef.current.clientWidth;
+      const parentWidth = containerRef.current?.clientWidth || (window.innerWidth - 32);
+      if (invoice) {
         const baseWidth = invoice.business?.invoice_theme === 'thermal' ? 280 : 794;
         
         if (parentWidth < baseWidth) {
@@ -131,11 +131,11 @@ export default function PublicInvoice() {
       </div>
 
       {/* Content */}
-      <div className="max-w-4xl mx-auto p-4 sm:p-8">
+      <div className="max-w-4xl mx-auto p-0 sm:p-8">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800"
+          className="bg-white dark:bg-slate-900 rounded-none sm:rounded-3xl shadow-none sm:shadow-2xl overflow-hidden border-0 sm:border border-slate-200 dark:border-slate-800"
         >
           {/* Quick Stats Banner */}
           <div className="bg-indigo-600 p-6 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -156,7 +156,7 @@ export default function PublicInvoice() {
           </div>
 
           {/* Rendered Invoice Template */}
-          <div ref={containerRef} className="p-4 sm:p-8 overflow-hidden flex flex-col items-center">
+          <div ref={containerRef} className="p-2 sm:p-8 overflow-hidden flex flex-col items-center min-h-[400px]">
             <div 
               style={{ 
                 width: `${baseWidth * scale}px`,

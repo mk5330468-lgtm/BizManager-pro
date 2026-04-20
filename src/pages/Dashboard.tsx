@@ -19,6 +19,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { DashboardStats } from '../types';
 import { formatCurrency, formatWhatsAppLink } from '../lib/utils';
 import { supabaseService } from '../services/supabaseService';
+import GlobalSearch from '../components/GlobalSearch';
 
 const StatCard = ({ title, value, icon: Icon, color, trend, onClick }: { title: string, value: string | number, icon: any, color: string, trend?: string, onClick?: () => void }) => (
   <motion.div 
@@ -148,6 +149,11 @@ export default function Dashboard() {
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Dashboard Overview</h2>
           <p className="text-slate-500 dark:text-slate-400">Welcome back! Here's what's happening with your business today.</p>
         </div>
+        
+        <div className="flex-1 max-w-md w-full">
+          <GlobalSearch />
+        </div>
+
         <Link 
           to="/invoices/new"
           className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white p-3 sm:px-6 sm:py-3 rounded-xl font-bold transition-all shadow-lg shadow-indigo-100 dark:shadow-indigo-900/20"

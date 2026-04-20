@@ -75,14 +75,17 @@ const fetchWithBusinessId = async (url: string, options: RequestInit = {}) => {
             .catch(() => {});
         }, 100);
       }
+      const responseString = JSON.stringify(cached.data);
       return {
         ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: new Headers({ 'Content-Type': 'application/json', 'x-cache': 'HIT' }),
         json: async () => cached.data,
-        text: async () => JSON.stringify(cached.data),
-        clone: () => ({
-          json: async () => cached.data,
-          text: async () => JSON.stringify(cached.data)
-        })
+        text: async () => responseString,
+        blob: async () => new Blob([responseString], { type: 'application/json' }),
+        arrayBuffer: async () => new TextEncoder().encode(responseString).buffer,
+        clone: function() { return { ...this }; }
       } as any;
     }
   } else {
@@ -99,10 +102,19 @@ const fetchWithBusinessId = async (url: string, options: RequestInit = {}) => {
 
   const headers = constructHeaders(cachedSession, url, options);
   if (headers === null) {
-     return {
+    const responseData = { error: 'Business ID required' };
+    const responseString = JSON.stringify(responseData);
+    
+    return {
       ok: false,
       status: 400,
-      json: async () => ({ error: 'Business ID required' }),
+      statusText: 'Bad Request',
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      json: async () => responseData,
+      text: async () => responseString,
+      blob: async () => new Blob([responseString], { type: 'application/json' }),
+      arrayBuffer: async () => new TextEncoder().encode(responseString).buffer,
+      clone: function() { return { ...this }; }
     } as any;
   }
 
@@ -110,8 +122,15 @@ const fetchWithBusinessId = async (url: string, options: RequestInit = {}) => {
     const res = await fetch(url, { ...options, headers });
     
     if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      const errorMessage = errorData.error || errorData.message || `Request failed with status ${res.status}`;
+      // Safely try to get error data
+      let errorMessage = `Request failed with status ${res.status}`;
+      try {
+        const clonedRes = res.clone();
+        const errorData = await clonedRes.json().catch(() => ({}));
+        errorMessage = errorData.error || errorData.message || errorMessage;
+      } catch (e) {
+        // Fallback if clone/json fails
+      }
       throw new Error(errorMessage);
     }
 
@@ -551,6 +570,13 @@ export const supabaseService = {
       method: 'DELETE'
     });
     if (!res.ok) throw new Error('Failed to delete account');
+    return await safeJson(res);
+  },
+
+  async search(query: string) {
+    if (!query || query.length < 2) return { products: [], customers: [] };
+    const res = await fetchWithBusinessId(`/api/search?q=${encodeURIComponent(query)}`);
+    if (!res.ok) throw new Error('Search failed');
     return await safeJson(res);
   },
 

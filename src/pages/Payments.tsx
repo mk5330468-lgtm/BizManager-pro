@@ -240,10 +240,7 @@ export default function Payments() {
                       className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors"
                     >
                       <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                        <div className="flex flex-col">
-                          <span className="text-[10px] sm:text-sm font-medium text-slate-900 dark:text-white">{formatDate(payment.payment_date)}</span>
-                          <span className="text-[9px] text-slate-400 uppercase tracking-tight">{new Date(payment.payment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
+                        <span className="text-[10px] sm:text-sm font-medium text-slate-900 dark:text-white">{formatDate(payment.payment_date)}</span>
                       </td>
                       <td className="px-3 sm:px-6 py-3 sm:py-4">
                         <div className="flex flex-col">

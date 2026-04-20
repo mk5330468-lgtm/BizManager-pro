@@ -178,21 +178,21 @@ Thank you!`;
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3"
       >
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">CRM & Customers</h2>
-          <p className="text-slate-500 dark:text-slate-400">Manage your client relationships, history and balances.</p>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white leading-tight">CRM & Customers</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Manage client relationships and balances.</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-indigo-100 dark:shadow-indigo-900/20"
+          className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold transition-all shadow-md shadow-indigo-100 dark:shadow-indigo-900/20 text-sm"
         >
-          <UserPlus size={20} />
+          <UserPlus size={18} />
           Add Customer
         </button>
       </motion.div>
@@ -214,21 +214,21 @@ Thank you!`;
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm"
+        className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm"
       >
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={20} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
           <input 
             type="text" 
-            placeholder="Search customers by name or phone..." 
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white transition-all"
+            placeholder="Search customers..." 
+            className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white transition-all text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         <AnimatePresence mode="popLayout">
           {loading ? (
             <motion.div 
@@ -236,9 +236,9 @@ Thank you!`;
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               key="loading"
-              className="col-span-full py-10 text-center text-slate-500 dark:text-slate-400"
+              className="col-span-full py-8 text-center text-slate-500 dark:text-slate-400 text-xs"
             >
-              Loading customers...
+              Loading...
             </motion.div>
           ) : filteredCustomers.length === 0 ? (
             <motion.div 
@@ -246,7 +246,7 @@ Thank you!`;
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               key="empty"
-              className="col-span-full py-10 text-center text-slate-500 dark:text-slate-400"
+              className="col-span-full py-8 text-center text-slate-500 dark:text-slate-400 text-xs"
             >
               No customers found.
             </motion.div>
@@ -257,16 +257,16 @@ Thank you!`;
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
               key={customer.id}
-              className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all group"
+              className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all group"
             >
-            <div className="flex items-start justify-between mb-4">
-              <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold text-lg">
+            <div className="flex items-start justify-between mb-3">
+              <div className="w-9 h-9 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold">
                 {customer.name.charAt(0)}
               </div>
               <div className="text-right">
-                <p className="text-xs text-slate-500 dark:text-slate-500 uppercase font-bold tracking-wider">Balance</p>
+                <p className="text-[10px] text-slate-400 uppercase font-black tracking-tight">Balance</p>
                 <p className={cn(
-                  "text-lg font-bold",
+                  "text-base font-black",
                   customer.outstanding_balance > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
                 )}>
                   {formatCurrency(customer.outstanding_balance)}
@@ -274,24 +274,20 @@ Thank you!`;
               </div>
             </div>
             
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">{customer.name}</h3>
+            <h3 className="text-sm font-black text-slate-900 dark:text-white mb-3 truncate">{customer.name}</h3>
             
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-400">
-                <Phone size={16} className="text-slate-400 dark:text-slate-500" />
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-400">
+                <Phone size={14} className="text-slate-400" />
                 <span>{customer.phone || 'No phone'}</span>
               </div>
-              <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-400">
-                <Mail size={16} className="text-slate-400 dark:text-slate-500" />
-                <span className="truncate">{customer.email || 'No email'}</span>
-              </div>
-              <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-400">
-                <MapPin size={16} className="text-slate-400 dark:text-slate-500" />
+              <div className="flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-400">
+                <MapPin size={14} className="text-slate-400" />
                 <span className="truncate">{customer.address || 'No address'}</span>
               </div>
             </div>
 
-            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-1.5">
               <button 
                 onClick={() => {
                   setSelectedCustomerForPayment(customer);
@@ -304,10 +300,10 @@ Thank you!`;
                     notes: ''
                   });
                 }}
-                className="p-2.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all"
+                className="p-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all"
                 title="Pay In"
               >
-                <Wallet size={18} />
+                <Wallet size={16} />
               </button>
               <button 
                 onClick={() => {
@@ -315,24 +311,24 @@ Thank you!`;
                   setIsHistoryModalOpen(true);
                   fetchCustomerHistory(customer.id);
                 }}
-                className="p-2.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"
+                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-all"
                 title="CRM Profile"
               >
-                <History size={18} />
+                <History size={16} />
               </button>
               <button 
                 onClick={() => sendReminder(customer)}
-                className="p-2.5 text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-xl transition-all"
-                title="Send Payment Reminder"
+                className="p-2 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-all"
+                title="Reminder"
               >
-                <Send size={18} />
+                <Send size={16} />
               </button>
               <button 
                 onClick={() => handleDelete(customer.id)}
-                className="p-2.5 text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-xl transition-all"
-                title="Delete Customer"
+                className="p-2 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-all"
+                title="Delete"
               >
-                <Trash2 size={18} />
+                <Trash2 size={16} />
               </button>
             </div>
           </motion.div>

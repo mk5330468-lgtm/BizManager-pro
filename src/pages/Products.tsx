@@ -136,21 +136,21 @@ export default function Products() {
     });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3"
       >
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Products & Inventory</h2>
-          <p className="text-slate-500 dark:text-slate-400">Manage your stock and pricing.</p>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white leading-tight">Products & Inventory</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Manage stock and pricing.</p>
         </div>
         <button 
           onClick={() => { setEditingProduct(null); setIsModalOpen(true); }}
-          className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-indigo-100 dark:shadow-indigo-900/20"
+          className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold transition-all shadow-md shadow-indigo-100 dark:shadow-indigo-900/20 text-sm"
         >
-          <Plus size={20} />
+          <Plus size={18} />
           Add Product
         </button>
       </motion.div>
@@ -160,22 +160,22 @@ export default function Products() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row gap-4"
+        className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row gap-3"
       >
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={20} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
           <input 
             type="text" 
-            placeholder="Search products by name, SKU or category..." 
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white transition-all"
+            placeholder="Search products..." 
+            className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white transition-all text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         <div className="flex items-center gap-2">
-          <Filter size={20} className="text-slate-400" />
+          <Filter size={16} className="text-slate-400" />
           <select 
-            className="bg-transparent border-none focus:ring-0 text-slate-600 dark:text-slate-400 font-medium cursor-pointer outline-none"
+            className="bg-transparent border-none focus:ring-0 text-slate-600 dark:text-slate-400 font-bold text-xs cursor-pointer outline-none"
             value={filterOption}
             onChange={(e) => setFilterOption(e.target.value as any)}
           >
@@ -189,16 +189,16 @@ export default function Products() {
       </motion.div>
 
       {/* Product Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/50 border-bottom border-slate-200 dark:border-slate-800">
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Product</th>
-                <th className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Category</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Stock</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Price</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Actions</th>
+                <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Product</th>
+                <th className="hidden sm:table-cell px-3 py-2.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Category</th>
+                <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Stock</th>
+                <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Price</th>
+                <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -210,7 +210,7 @@ export default function Products() {
                     exit={{ opacity: 0 }}
                     key="loading"
                   >
-                    <td colSpan={5} className="px-6 py-10 text-center text-slate-500 dark:text-slate-400">Loading products...</td>
+                    <td colSpan={5} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400 text-xs">Loading...</td>
                   </motion.tr>
                 ) : filteredProducts.length === 0 ? (
                   <motion.tr 
@@ -219,7 +219,7 @@ export default function Products() {
                     exit={{ opacity: 0 }}
                     key="empty"
                   >
-                    <td colSpan={5} className="px-6 py-10 text-center text-slate-500 dark:text-slate-400">No products found.</td>
+                    <td colSpan={5} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400 text-xs">No products found.</td>
                   </motion.tr>
                 ) : filteredProducts.map((product) => (
                   <motion.tr 
@@ -230,43 +230,43 @@ export default function Products() {
                     key={product.id} 
                     className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
                   >
-                  <td className="px-3 sm:px-6 py-3 sm:py-4">
+                  <td className="px-3 py-2.5">
                     <div className="flex flex-col">
-                      <span className="text-[10px] sm:text-sm font-bold text-slate-900 dark:text-white truncate max-w-[100px] sm:max-w-none">{product.name}</span>
-                      <span className="text-[9px] sm:text-xs text-slate-500 dark:text-slate-400">SKU: {product.sku || 'N/A'}</span>
+                      <span className="text-[11px] font-bold text-slate-900 dark:text-white truncate max-w-[100px] sm:max-w-none">{product.name}</span>
+                      <span className="text-[9px] text-slate-500 dark:text-slate-400">SKU: {product.sku || 'N/A'}</span>
                     </div>
                   </td>
-                  <td className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] sm:text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200">
-                      {product.category || 'Uncategorized'}
+                  <td className="hidden sm:table-cell px-3 py-2.5">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-lg text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 uppercase tracking-tight">
+                      {product.category || 'None'}
                     </span>
                   </td>
-                  <td className="px-3 sm:px-6 py-3 sm:py-4">
-                    <div className="flex items-center gap-1 sm:gap-2">
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-1">
                       <span className={cn(
-                        "text-[10px] sm:text-sm font-bold",
+                        "text-[11px] font-black",
                         product.stock_quantity <= product.low_stock_alert ? "text-rose-600 dark:text-rose-400" : "text-slate-900 dark:text-white"
                       )}>
                         {product.stock_quantity}
                       </span>
                       {product.stock_quantity <= product.low_stock_alert && (
-                        <AlertCircle size={12} className="text-rose-500" />
+                        <AlertCircle size={10} className="text-rose-500" />
                       )}
                     </div>
                   </td>
-                  <td className="px-3 sm:px-6 py-3 sm:py-4">
+                  <td className="px-3 py-2.5">
                     <div className="flex flex-col">
-                      <span className="text-[10px] sm:text-sm font-bold text-slate-900 dark:text-white">{formatCurrency(product.selling_price)}</span>
+                      <span className="text-[11px] font-black text-slate-900 dark:text-white">{formatCurrency(product.selling_price)}</span>
                       <span className="hidden sm:inline text-[9px] text-slate-500 dark:text-slate-400">Cost: {formatCurrency(product.purchase_price)}</span>
                     </div>
                   </td>
-                  <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
-                    <div className="flex items-center justify-end gap-1 sm:gap-2 transition-opacity">
-                      <button onClick={() => handleEdit(product)} className="p-1.5 sm:p-2 text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all">
-                        <Edit2 size={16} />
+                  <td className="px-3 py-2.5 text-right">
+                    <div className="flex items-center justify-end gap-0.5">
+                      <button onClick={() => handleEdit(product)} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-md transition-all">
+                        <Edit2 size={13} />
                       </button>
-                      <button onClick={() => handleDelete(product.id)} className="p-1.5 sm:p-2 text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-all">
-                        <Trash2 size={16} />
+                      <button onClick={() => handleDelete(product.id)} className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-md transition-all">
+                        <Trash2 size={13} />
                       </button>
                     </div>
                   </td>

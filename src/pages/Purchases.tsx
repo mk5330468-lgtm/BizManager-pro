@@ -327,11 +327,11 @@ export default function Purchases() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Purchase Records</h2>
-          <p className="text-slate-500 dark:text-slate-400">Track inventory restocking and supplier payments.</p>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white leading-tight">Purchases</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Track restocking and expenses.</p>
         </div>
         <button 
           onClick={() => {
@@ -358,20 +358,20 @@ export default function Purchases() {
               setIsExpenseModalOpen(true);
             }
           }}
-          className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-indigo-100 dark:shadow-indigo-900/20"
+          className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-bold transition-all shadow-lg text-sm"
         >
-          <Plus size={20} />
-          {activeTab === 'records' ? 'Record Purchase' : 'Record Expense'}
+          <Plus size={18} />
+          {activeTab === 'records' ? 'Purchase' : 'Expense'}
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl w-full overflow-x-auto no-scrollbar scroll-smooth relative">
+      <div className="flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit overflow-x-auto no-scrollbar scroll-smooth relative">
         <div className="flex min-w-max">
           <button 
             onClick={() => setActiveTab('records')}
             className={cn(
-              "flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all relative z-10",
+              "flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold transition-all relative z-10 text-xs",
               activeTab === 'records' 
                 ? "text-indigo-600" 
                 : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
@@ -380,19 +380,19 @@ export default function Purchases() {
             {activeTab === 'records' && (
               <motion.div 
                 layoutId="activeTab"
-                className="absolute inset-0 bg-white dark:bg-slate-900 rounded-xl shadow-sm"
+                className="absolute inset-0 bg-white dark:bg-slate-900 rounded-lg shadow-sm"
                 transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
               />
             )}
             <span className="relative z-20 flex items-center gap-2">
-              <List size={18} />
+              <List size={14} />
               Records
             </span>
           </button>
           <button 
             onClick={() => setActiveTab('expenses')}
             className={cn(
-              "flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all relative z-10",
+              "flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold transition-all relative z-10 text-xs",
               activeTab === 'expenses' 
                 ? "text-indigo-600" 
                 : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
@@ -401,12 +401,12 @@ export default function Purchases() {
             {activeTab === 'expenses' && (
               <motion.div 
                 layoutId="activeTab"
-                className="absolute inset-0 bg-white dark:bg-slate-900 rounded-xl shadow-sm"
+                className="absolute inset-0 bg-white dark:bg-slate-900 rounded-lg shadow-sm"
                 transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
               />
             )}
             <span className="relative z-20 flex items-center gap-2">
-              <Receipt size={18} />
+              <Receipt size={14} />
               Expenses
             </span>
           </button>
@@ -451,14 +451,14 @@ export default function Purchases() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-800/50 border-bottom border-slate-200 dark:border-slate-800">
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Purchase #</th>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Supplier</th>
-                    <th className="hidden md:table-cell px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Date</th>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Amount</th>
-                    <th className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Paid</th>
-                    <th className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pending</th>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Actions</th>
+                    <th className="px-3 sm:px-6 py-2 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">ID</th>
+                    <th className="px-3 sm:px-6 py-2 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Supplier</th>
+                    <th className="hidden md:table-cell px-3 sm:px-6 py-2 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Date</th>
+                    <th className="px-3 sm:px-6 py-2 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total</th>
+                    <th className="hidden sm:table-cell px-3 sm:px-6 py-2 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Paid</th>
+                    <th className="hidden sm:table-cell px-3 sm:px-6 py-2 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Due</th>
+                    <th className="px-3 sm:px-6 py-2 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
+                    <th className="px-3 sm:px-6 py-2 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -477,41 +477,41 @@ export default function Purchases() {
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, scale: 0.95 }}
                           transition={{ delay: index * 0.03 }}
-                          className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group"
+                          className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group text-xs font-bold"
                         >
-                          <td className="px-3 sm:px-6 py-3 sm:py-4">
-                            <span className="text-[10px] sm:text-sm font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded-lg">
+                          <td className="px-3 sm:px-6 py-2">
+                            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-1.5 py-0.5 rounded-lg">
                               #{purchase.purchase_number || purchase.id}
                             </span>
                           </td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4">
+                          <td className="px-3 sm:px-6 py-2">
                             <div className="flex flex-col">
-                              <span className="text-[10px] sm:text-sm font-semibold text-slate-900 dark:text-white truncate max-w-[80px] sm:max-w-none">{purchase.supplier_name}</span>
-                              <span className="md:hidden text-[9px] text-slate-500">{formatDate(purchase.purchase_date)}</span>
+                              <span className="text-[11px] font-black text-slate-900 dark:text-white truncate max-w-[80px] sm:max-w-none">{purchase.supplier_name}</span>
+                              <span className="md:hidden text-[9px] text-slate-500 font-bold">{formatDate(purchase.purchase_date)}</span>
                             </div>
                           </td>
-                          <td className="hidden md:table-cell px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-sm text-slate-600 dark:text-slate-400">
+                          <td className="hidden md:table-cell px-3 sm:px-6 py-2 text-[11px] text-slate-600 dark:text-slate-400">
                             {formatDate(purchase.purchase_date)}
                           </td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4">
-                            <span className="text-[10px] sm:text-sm font-bold text-slate-900 dark:text-white">{formatCurrency(purchase.total_amount)}</span>
+                          <td className="px-3 sm:px-6 py-2">
+                            <span className="text-[11px] font-black text-slate-900 dark:text-white">{formatCurrency(purchase.total_amount)}</span>
                           </td>
-                          <td className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4">
-                            <span className="text-[10px] sm:text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                          <td className="hidden sm:table-cell px-3 sm:px-6 py-2">
+                            <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400">
                               {formatCurrency(purchase.amount_paid || (purchase.total_amount - (purchase.balance_due || 0)))}
                             </span>
                           </td>
-                          <td className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4">
+                          <td className="hidden sm:table-cell px-3 sm:px-6 py-2">
                             <span className={cn(
-                              "text-[10px] sm:text-sm font-medium",
+                              "text-[11px] font-black",
                               purchase.balance_due > 0 ? "text-rose-600 dark:text-rose-400" : "text-slate-400"
                             )}>
                               {formatCurrency(purchase.balance_due)}
                             </span>
                           </td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4">
+                          <td className="px-3 sm:px-6 py-2">
                             <span className={cn(
-                              "px-2 py-1 rounded-lg text-[9px] sm:text-[10px] font-bold uppercase tracking-wider",
+                              "px-1.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-tighter",
                               purchase.payment_status === 'paid' 
                                 ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/50" 
                                 : purchase.payment_status === 'partial'
@@ -521,31 +521,22 @@ export default function Purchases() {
                               {purchase.payment_status}
                             </span>
                           </td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
+                          <td className="px-3 sm:px-6 py-2 text-right">
                             <div className="flex items-center justify-end gap-1 sm:gap-2">
                               <button 
                                 onClick={() => {
                                   setSelectedPurchase(purchase);
                                   setIsPreviewOpen(true);
                                 }}
-                                className="p-1.5 sm:p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all"
-                                title="View Details"
+                                className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-white rounded transition-all"
                               >
-                                <Eye size={16} />
+                                <Eye size={14} />
                               </button>
                               <button 
                                 onClick={() => handleEditPurchase(purchase)}
-                                className="p-1.5 sm:p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-all"
-                                title="Edit Purchase"
+                                className="p-1 text-slate-400 hover:text-amber-600 hover:bg-white rounded transition-all"
                               >
-                                <Edit3 size={16} />
-                              </button>
-                              <button 
-                                onClick={() => handleDeletePurchase(purchase.id)}
-                                className="p-1.5 sm:p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-all"
-                                title="Delete Purchase"
-                              >
-                                <Trash2 size={16} />
+                                <Edit3 size={14} />
                               </button>
                             </div>
                           </td>

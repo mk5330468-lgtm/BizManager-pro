@@ -332,64 +332,62 @@ Thank you for your business!`;
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3"
       >
-        <div className="flex items-center gap-4">
-          <Link to="/invoices" className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
-            <ChevronLeft size={24} className="dark:text-white" />
+        <div className="flex items-center gap-3">
+          <Link to="/invoices" className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+            <ChevronLeft size={20} className="dark:text-white" />
           </Link>
           <div>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{id ? 'Edit Invoice' : 'Create New Invoice'}</h2>
-            <p className="text-slate-500 dark:text-slate-400">{id ? 'Update the details of this invoice.' : 'Fill in the details to generate a professional invoice.'}</p>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white leading-tight">{id ? 'Edit Invoice' : 'Create Invoice'}</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Fill details to generate invoice.</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {id && (
             <button 
               onClick={() => generateInvoicePDF(savedInvoiceData!)}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 transition-all"
+              className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 transition-all text-sm"
             >
-              <Download size={18} />
+              <Download size={16} />
               PDF
             </button>
           )}
         </div>
       </motion.div>
 
-      {/* Success Modal removed - navigating to invoices list instead */}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Customer & Items */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4">
           {/* Customer & Date Selection */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 }}
-              className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm relative"
+              className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative"
             >
-              <div className="flex items-center justify-between mb-4">
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Customer (Optional)</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tight">Customer (Optional)</label>
                 <button 
                   onClick={() => setIsQuickAddOpen(true)}
-                  className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                  className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
                 >
-                  <UserPlus size={14} />
-                  Quick Add
+                  <Plus size={12} />
+                  Add New
                 </button>
               </div>
               <div className="relative">
                 <div className="relative group">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={18} />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={16} />
                   <input 
                     type="text" 
-                    placeholder="Search customer by name or phone..." 
-                    className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 dark:text-white outline-none transition-all font-medium"
+                    placeholder="Search customer..." 
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 dark:text-white outline-none transition-all font-bold text-sm"
                     value={customerSearch}
                     onChange={(e) => {
                       setCustomerSearch(e.target.value);
@@ -468,15 +466,15 @@ Thank you for your business!`;
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
-              className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm"
+              className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm"
             >
-              <div className="flex items-center gap-2 mb-4">
-                <CalendarIcon size={16} className="text-slate-400 dark:text-slate-500" />
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Invoice Date</label>
+              <div className="flex items-center gap-2 mb-2">
+                <CalendarIcon size={14} className="text-slate-400" />
+                <label className="text-[11px] font-bold text-slate-500 uppercase">Invoice Date</label>
               </div>
               <input 
                 type="date" 
-                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white outline-none"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white outline-none text-sm font-bold"
                 value={invoiceDate}
                 onChange={(e) => setInvoiceDate(e.target.value)}
               />
@@ -664,28 +662,28 @@ Thank you for your business!`;
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="bg-white dark:bg-slate-900 p-8 rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm"
+            className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm"
           >
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Add Items</h3>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Select products for invoice</p>
+                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Line Items</h3>
+                <p className="text-[10px] font-bold text-slate-400 tracking-tight">Select products</p>
               </div>
               <button 
                 onClick={() => setIsQuickProductAddOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-all"
+                className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-black uppercase hover:bg-indigo-100 transition-all border border-indigo-100 dark:border-indigo-800"
               >
-                <Plus size={16} />
+                <Plus size={14} />
                 New Product
               </button>
             </div>
-            <div className="relative mb-8">
+            <div className="relative mb-4">
               <div className="relative group">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={16} />
                 <input 
                   type="text" 
-                  placeholder="Search products by name or SKU..." 
-                  className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 dark:text-white transition-all font-medium"
+                  placeholder="Search products..." 
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 dark:text-white transition-all font-bold text-sm"
                   value={productSearch}
                   onChange={(e) => {
                     setProductSearch(e.target.value);
@@ -738,15 +736,15 @@ Thank you for your business!`;
 
             {/* Line Items Table */}
             <div className="overflow-x-auto no-scrollbar">
-              <table className="w-full text-left border-collapse min-w-[600px]">
+              <table className="w-full text-left border-collapse min-w-[500px]">
                 <thead>
                   <tr className="border-b border-slate-100 dark:border-slate-800">
-                    <th className="pb-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Item Details</th>
-                    <th className="pb-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Quantity</th>
-                    <th className="pb-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Unit Price</th>
-                    <th className="pb-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Discount</th>
-                    <th className="pb-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Total</th>
-                    <th className="pb-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right"></th>
+                    <th className="pb-2 text-[9px] font-black text-slate-400 uppercase tracking-tight">Item</th>
+                    <th className="pb-2 text-[9px] font-black text-slate-400 uppercase tracking-tight text-center">Qty</th>
+                    <th className="pb-2 text-[9px] font-black text-slate-400 uppercase tracking-tight text-right">Price</th>
+                    <th className="pb-2 text-[9px] font-black text-slate-400 uppercase tracking-tight text-right">Disc</th>
+                    <th className="pb-2 text-[9px] font-black text-slate-400 uppercase tracking-tight text-right">Total</th>
+                    <th className="pb-2 text-[9px] font-black text-slate-400 uppercase tracking-tight text-right"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -758,9 +756,9 @@ Thank you for your business!`;
                         exit={{ opacity: 0 }}
                         key="empty"
                       >
-                        <td colSpan={6} className="py-20 text-center">
-                          <Box size={48} className="mx-auto text-slate-200 dark:text-slate-700 mb-4" />
-                          <p className="text-sm text-slate-400 font-medium italic">No items added to this invoice yet.</p>
+                        <td colSpan={6} className="py-12 text-center">
+                          <Box size={32} className="mx-auto text-slate-200 dark:text-slate-700 mb-2" />
+                          <p className="text-[11px] text-slate-400 font-bold italic">No items added.</p>
                         </td>
                       </motion.tr>
                     ) : lineItems.map((item, index) => (
@@ -772,62 +770,62 @@ Thank you for your business!`;
                         key={`${item.product_id}-${index}`} 
                         className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
                       >
-                      <td className="py-5">
-                        <p className="font-bold text-slate-900 dark:text-white">{item.name}</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Tax: {item.tax_percentage}%</p>
+                      <td className="py-2">
+                        <p className="text-[13px] font-bold text-slate-900 dark:text-white truncate max-w-[120px]">{item.name}</p>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Tax: {item.tax_percentage}%</p>
                       </td>
-                      <td className="py-5">
-                        <div className="flex items-center justify-center gap-3">
+                      <td className="py-2">
+                        <div className="flex items-center justify-center gap-1.5">
                           <button 
                             onClick={() => updateQuantity(index, item.quantity - 1)} 
-                            className="w-8 h-8 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm transition-all dark:text-white"
+                            className="w-6 h-6 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white text-[11px] font-bold dark:text-white"
                           >
                             -
                           </button>
-                          <span className="w-8 text-center font-black text-slate-900 dark:text-white">{item.quantity}</span>
+                          <span className="w-5 text-center font-black text-slate-900 dark:text-white text-[13px]">{item.quantity}</span>
                           <button 
                             onClick={() => updateQuantity(index, item.quantity + 1)} 
-                            className="w-8 h-8 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm transition-all dark:text-white"
+                            className="w-6 h-6 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white text-[11px] font-bold dark:text-white"
                           >
                             +
                           </button>
                         </div>
                       </td>
-                      <td className="py-5 text-right">
-                        <div className="relative inline-block">
-                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">₹</span>
+                      <td className="py-2 text-right">
+                        <div className="relative inline-block w-20">
+                          <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400">₹</span>
                           <input 
                             type="number" 
-                            className="w-24 pl-5 pr-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-right text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none dark:text-white transition-all underline decoration-dotted decoration-slate-300 hover:decoration-indigo-500"
-                            placeholder="0"
+                            className="w-full pl-4 pr-1 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-right font-bold text-[13px] dark:text-white focus:ring-2 focus:ring-indigo-500/20"
                             value={item.price || ''}
-                            onChange={(e) => updatePrice(index, e.target.value === '' ? 0 : Number(e.target.value))}
+                            onChange={(e) => updatePrice(index, Number(e.target.value))}
                           />
                         </div>
                       </td>
-                      <td className="py-5 text-right">
-                        <div className="relative inline-block">
-                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">₹</span>
+                      <td className="py-2 text-right">
+                        <div className="relative inline-block w-16">
+                          <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400">₹</span>
                           <input 
                             type="number" 
-                            className="w-20 pl-5 pr-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-right text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none dark:text-white transition-all"
-                            placeholder="0"
+                            className="w-full pl-4 pr-1 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-right font-bold text-[13px] text-rose-500 focus:ring-2 focus:ring-rose-500/20"
                             value={item.discount || ''}
-                            onChange={(e) => updateDiscount(index, e.target.value === '' ? 0 : Number(e.target.value))}
+                            onChange={(e) => updateDiscount(index, Number(e.target.value))}
                           />
                         </div>
                       </td>
-                      <td className="py-5 text-right font-black text-slate-900 dark:text-white">{formatCurrency(item.total)}</td>
-                      <td className="py-5 text-right">
+                      <td className="py-2 text-right">
+                        <p className="font-black text-slate-900 dark:text-white text-[13px]">{formatCurrency(item.total)}</p>
+                      </td>
+                      <td className="py-2 text-right">
                         <button 
-                          onClick={() => removeLineItem(index)} 
-                          className="p-2 text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                          onClick={() => removeLineItem(index)}
+                          className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-all"
                         >
-                          <Trash2 size={18} />
+                          <Trash2 size={14} />
                         </button>
                       </td>
-                      </motion.tr>
-                    ))}
+                    </motion.tr>
+                  ))}
                   </AnimatePresence>
                 </tbody>
               </table>
@@ -840,49 +838,49 @@ Thank you for your business!`;
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.4 }}
-          className="space-y-6"
+          className="space-y-4"
         >
-          <div className="bg-white dark:bg-slate-900 p-8 rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm sticky top-24">
-            <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight mb-8">Order Summary</h3>
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm sticky top-20">
+            <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight mb-4">Summary</h3>
             
-            <div className="space-y-5 mb-8">
-              <div className="flex justify-between text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest">
+            <div className="space-y-3 mb-4">
+              <div className="flex justify-between text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-wider">
                 <span>Subtotal</span>
                 <span className="text-slate-900 dark:text-white">{formatCurrency(subtotal)}</span>
               </div>
-              <div className="flex justify-between text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest">
+              <div className="flex justify-between text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-wider">
                 <div className="flex items-center gap-1">
-                  <Calculator size={14} />
-                  <span>Tax Amount</span>
+                  <Calculator size={12} />
+                  <span>Tax</span>
                 </div>
                 <span className="text-slate-900 dark:text-white">{formatCurrency(taxAmount)}</span>
               </div>
-              <div className="flex justify-between items-center text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest">
+              <div className="flex justify-between items-center text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-wider">
                 <div className="flex items-center gap-1">
-                  <Tag size={14} />
+                  <Tag size={12} />
                   <span>Discount</span>
                 </div>
                 <div className="relative">
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">₹</span>
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400">₹</span>
                   <input 
                     type="number" 
-                    className="w-28 pl-5 pr-2 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-right font-black focus:ring-4 focus:ring-indigo-500/10 outline-none dark:text-white transition-all"
+                    className="w-24 pl-5 pr-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-right font-black focus:ring-4 focus:ring-indigo-500/10 outline-none dark:text-white transition-all text-xs"
                     placeholder="0"
                     value={discount || ''}
                     onChange={(e) => setDiscount(e.target.value === '' ? 0 : Number(e.target.value))}
                   />
                 </div>
               </div>
-              <div className="pt-6 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                <span className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Grand Total</span>
-                <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400">{formatCurrency(totalAmount)}</span>
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                <span className="text-xs font-black text-slate-900 dark:text-white uppercase">Grand Total</span>
+                <span className="text-xl font-black text-indigo-600 dark:text-indigo-400">{formatCurrency(totalAmount)}</span>
               </div>
             </div>
 
-            <div className="space-y-6 mb-10">
-              <div className="space-y-3">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Payment Mode</label>
-                <div className="grid grid-cols-3 gap-2">
+            <div className="space-y-4 mb-4">
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Payment</label>
+                <div className="grid grid-cols-3 gap-1.5">
                   {[
                     { id: 'cash', label: 'Cash', icon: Banknote },
                     { id: 'upi', label: 'UPI', icon: Smartphone },
@@ -890,19 +888,15 @@ Thank you for your business!`;
                   ].map(mode => (
                     <button 
                       key={mode.id}
-                      onClick={() => {
-                        if (paymentMode !== mode.id) {
-                          setPaymentMode(mode.id as any);
-                        }
-                      }}
+                      onClick={() => setPaymentMode(mode.id as any)}
                       className={cn(
-                        "py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex flex-col items-center justify-center gap-1",
+                        "py-2 rounded-lg text-[9px] font-black uppercase tracking-tight border transition-all flex flex-col items-center justify-center gap-1",
                         paymentMode === mode.id 
-                          ? "bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100 dark:shadow-indigo-900/20" 
-                          : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
+                          ? "bg-indigo-600 border-indigo-600 text-white shadow-lg" 
+                          : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500"
                       )}
                     >
-                      <mode.icon size={14} />
+                      <mode.icon size={12} />
                       {mode.label}
                     </button>
                   ))}
@@ -913,95 +907,58 @@ Thank you for your business!`;
                 <motion.div 
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
-                  className="space-y-6 overflow-hidden"
+                  className="space-y-3 overflow-hidden"
                 >
                   {paymentMode === 'both' ? (
-                    <div className="grid grid-cols-1 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Cash Amount</label>
+                    <div className="grid grid-cols-1 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Cash</label>
                         <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">₹</span>
                           <input 
                             type="number" 
-                            placeholder="0.00"
-                            className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-500/10 outline-none dark:text-white font-bold"
+                            className="w-full pl-7 pr-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none dark:text-white font-bold text-xs"
                             value={cashAmount === 0 ? '0' : cashAmount}
                             onChange={(e) => {
                               const val = e.target.value === '' ? '' : Number(e.target.value);
                               setCashAmount(val);
-                              const total = (Number(val) || 0) + (Number(upiAmount) || 0);
-                              setAmountPaid(total);
-                              if (total === 0) setPaymentStatus('unpaid');
-                              else if (total >= totalAmount) setPaymentStatus('paid');
-                              else setPaymentStatus('partial');
                             }}
                           />
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">UPI Amount</label>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">UPI</label>
                         <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">₹</span>
                           <input 
                             type="number" 
-                            placeholder="0.00"
-                            className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-500/10 outline-none dark:text-white font-bold"
-                            value={upiAmount === 0 ? '0' :upiAmount}
+                            className="w-full pl-7 pr-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none dark:text-white font-bold text-xs"
+                            value={upiAmount === 0 ? '0' : upiAmount}
                             onChange={(e) => {
                               const val = e.target.value === '' ? '' : Number(e.target.value);
                               setUpiAmount(val);
-                              const total = (Number(val) || 0) + (Number(cashAmount) || 0);
-                              setAmountPaid(total);
-                              if (total === 0) setPaymentStatus('unpaid');
-                              else if (total >= totalAmount) setPaymentStatus('paid');
-                              else setPaymentStatus('partial');
                             }}
                           />
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Payment Received</label>
-                      <div className="relative group">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 font-black text-lg">₹</span>
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Received</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 font-black text-sm">₹</span>
                         <input 
                           type="number" 
-                          placeholder="0.00"
-                          className="w-full pl-10 pr-4 py-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-black text-xl text-indigo-600 dark:text-indigo-400 transition-all placeholder:text-slate-300"
+                          className="w-full pl-8 pr-2 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:border-indigo-500 outline-none font-black text-base text-indigo-600 dark:text-indigo-400 transition-all"
                           value={amountPaid === 0 ? '0' : amountPaid || ''}
                           onChange={(e) => {
                             const val = e.target.value === '' ? '' : Number(e.target.value);
                             setAmountPaid(val);
-                            const numericVal = Number(val) || 0;
-                            if (numericVal === 0) setPaymentStatus('unpaid');
-                            else if (numericVal >= totalAmount) setPaymentStatus('paid');
-                            else setPaymentStatus('partial');
                           }}
                         />
                       </div>
                     </div>
                   )}
-
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Payment Status</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {['paid', 'unpaid', 'partial'].map(status => (
-                        <button 
-                          key={status}
-                          onClick={() => setPaymentStatus(status as any)}
-                          className={cn(
-                            "py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all",
-                            paymentStatus === status 
-                              ? "bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100 dark:shadow-indigo-900/20" 
-                              : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
-                          )}
-                        >
-                          {status}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                 </motion.div>
               )}
             </div>
@@ -1009,10 +966,10 @@ Thank you for your business!`;
             <button 
               onClick={handleSave}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white py-5 rounded-[24px] font-black text-xl transition-all shadow-2xl shadow-indigo-100 dark:shadow-indigo-900/20 transform active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white py-3 rounded-xl font-black text-sm transition-all shadow-xl"
             >
-              <Save size={24} />
-              {loading ? 'Processing...' : id ? 'Update Invoice' : 'Generate Invoice'}
+              <Save size={18} />
+              {loading ? 'Processing...' : id ? 'Update' : 'Generate'}
             </button>
           </div>
         </motion.div>

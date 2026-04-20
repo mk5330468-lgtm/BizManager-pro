@@ -261,16 +261,16 @@ Thank you for your business!`;
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Invoices</h2>
-          <p className="text-slate-500 dark:text-slate-400">View and manage your sales records.</p>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white leading-tight">Invoices</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">View and manage sales records.</p>
         </div>
         <Link to="/invoices/new">
-          <button className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white p-3 sm:px-6 sm:py-3 rounded-xl font-bold transition-all shadow-lg shadow-indigo-100 dark:shadow-indigo-900/20" title="Create Invoice">
-            <Plus size={20} />
-            <span className="hidden sm:inline">Create Invoice</span>
+          <button className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold transition-all shadow-md shadow-indigo-100 dark:shadow-indigo-900/20 text-sm" title="Create Invoice">
+            <Plus size={18} />
+            <span className="hidden sm:inline">New Invoice</span>
           </button>
         </Link>
       </div>
@@ -278,40 +278,40 @@ Thank you for your business!`;
       <motion.div 
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm"
+        className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm"
       >
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={20} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
           <input 
             type="text" 
-            placeholder="Search by invoice number or customer name..." 
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white transition-all"
+            placeholder="Search invoices..." 
+            className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white transition-all text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
       </motion.div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/50 border-bottom border-slate-200 dark:border-slate-800">
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Invoice</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Customer</th>
-                <th className="hidden md:table-cell px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Date</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total</th>
-                <th className="hidden lg:table-cell px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Paid</th>
-                <th className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Due</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Actions</th>
+                <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Invoice</th>
+                <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Customer</th>
+                <th className="hidden md:table-cell px-3 py-2.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Date</th>
+                <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total</th>
+                <th className="hidden lg:table-cell px-3 py-2.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Paid</th>
+                <th className="hidden sm:table-cell px-3 py-2.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Due</th>
+                <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
+                <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {loading ? (
-                <tr><td colSpan={8} className="px-6 py-10 text-center text-slate-500 dark:text-slate-400">Loading invoices...</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400 text-xs">Loading...</td></tr>
               ) : filteredInvoices.length === 0 ? (
-                <tr><td colSpan={8} className="px-6 py-10 text-center text-slate-500 dark:text-slate-400">No invoices found.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400 text-xs">No invoices found.</td></tr>
               ) : (
                 <AnimatePresence mode="popLayout">
                   {filteredInvoices.map((invoice, index) => (
@@ -323,43 +323,43 @@ Thank you for your business!`;
                       transition={{ delay: index * 0.05 }}
                       className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
                     >
-                      <td className="px-3 sm:px-6 py-3 sm:py-4">
-                        <span className="text-[10px] sm:text-sm font-bold text-slate-900 dark:text-white">#{invoice.invoice_number}</span>
+                      <td className="px-3 py-2.5">
+                        <span className="text-[11px] font-bold text-slate-900 dark:text-white">#{invoice.invoice_number}</span>
                       </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4">
-                        <span className="text-[10px] sm:text-sm text-slate-600 dark:text-slate-300 font-medium truncate max-w-[80px] sm:max-w-none block">{invoice.customer_name || 'Walk-in Customer'}</span>
+                      <td className="px-3 py-2.5">
+                        <span className="text-[11px] text-slate-600 dark:text-slate-300 font-medium truncate max-w-[80px] sm:max-w-none block">{invoice.customer_name || 'Walk-in'}</span>
                       </td>
-                      <td className="hidden md:table-cell px-3 sm:px-6 py-3 sm:py-4">
-                        <span className="text-slate-500 dark:text-slate-400 text-[10px] sm:text-sm">{formatDate(invoice.created_at)}</span>
+                      <td className="hidden md:table-cell px-3 py-2.5">
+                        <span className="text-slate-500 dark:text-slate-400 text-[11px]">{formatDate(invoice.created_at)}</span>
                       </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4">
-                        <span className="text-[10px] sm:text-sm font-bold text-slate-900 dark:text-white">{formatCurrency(invoice.total_amount)}</span>
+                      <td className="px-3 py-2.5">
+                        <span className="text-[11px] font-bold text-slate-900 dark:text-white uppercase tracking-tight">{formatCurrency(invoice.total_amount)}</span>
                       </td>
-                      <td className="hidden lg:table-cell px-3 sm:px-6 py-3 sm:py-4">
-                        <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[10px] sm:text-sm">{formatCurrency(invoice.amount_paid || 0)}</span>
+                      <td className="hidden lg:table-cell px-3 py-2.5">
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">{formatCurrency(invoice.amount_paid || 0)}</span>
                       </td>
-                      <td className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4">
-                        <span className="text-rose-600 dark:text-rose-400 font-bold text-[10px] sm:text-sm">{formatCurrency(Math.max(0, invoice.total_amount - (invoice.amount_paid || 0)))}</span>
+                      <td className="hidden sm:table-cell px-3 py-2.5">
+                        <span className="text-rose-600 dark:text-rose-400 font-bold text-[11px]">{formatCurrency(Math.max(0, invoice.total_amount - (invoice.amount_paid || 0)))}</span>
                       </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4">
+                      <td className="px-3 py-2.5">
                         <StatusBadge status={invoice.payment_status} />
                       </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
+                      <td className="px-3 py-2.5 text-right">
                         <div className="flex items-center justify-end gap-0.5">
-                          <button onClick={() => handleViewInvoice(invoice)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-md transition-all" title="View">
-                            <Eye size={14} />
+                          <button onClick={() => handleViewInvoice(invoice)} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-md transition-all" title="View">
+                            <Eye size={13} />
                           </button>
-                          <button onClick={() => shareOnWhatsApp(invoice)} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-md transition-all" title="Share">
-                            <Share2 size={14} />
+                          <button onClick={() => shareOnWhatsApp(invoice)} className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-md transition-all" title="Share">
+                            <Share2 size={13} />
                           </button>
-                          <button onClick={() => generateInvoicePDF(invoice, 'download')} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-md transition-all" title="Download">
-                            <Download size={14} />
+                          <button onClick={() => generateInvoicePDF(invoice, 'download')} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-md transition-all" title="Download">
+                            <Download size={13} />
                           </button>
-                          <button onClick={() => navigate(`/invoices/edit/${invoice.id}`)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-md transition-all" title="Edit">
-                            <Edit2 size={14} />
+                          <button onClick={() => navigate(`/invoices/edit/${invoice.id}`)} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-md transition-all" title="Edit">
+                            <Edit2 size={13} />
                           </button>
-                          <button onClick={() => handleDelete(invoice.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-md transition-all" title="Delete">
-                            <Trash2 size={14} />
+                          <button onClick={() => handleDelete(invoice.id)} className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-md transition-all" title="Delete">
+                            <Trash2 size={13} />
                           </button>
                         </div>
                       </td>

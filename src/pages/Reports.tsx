@@ -239,100 +239,100 @@ export default function Reports() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3"
       >
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Business Reports</h2>
-          <p className="text-slate-500 dark:text-slate-400">Analyze your sales performance and trends.</p>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white leading-tight">Reports</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Analyze performance trends.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 shadow-sm">
-            <Calendar size={18} className="text-slate-400" />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 shadow-sm">
+            <Calendar size={16} className="text-slate-400" />
             <input 
               type="month" 
               value={reportMonth}
               onChange={(e) => setReportMonth(e.target.value)}
-              className="bg-transparent border-none focus:ring-0 text-sm font-bold text-slate-700 dark:text-slate-200 outline-none"
+              className="bg-transparent border-none focus:ring-0 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none w-28"
             />
           </div>
           <button 
             onClick={exportToPDF}
-            className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-indigo-100 dark:shadow-indigo-900/20"
+            className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-bold transition-all shadow-md shadow-indigo-100 dark:shadow-indigo-900/20 text-sm"
           >
-            <Download size={20} />
-            Export Report
+            <Download size={18} />
+            Export
           </button>
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Monthly Summary Card (Handwritten Style) */}
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.1 }}
-          className="lg:col-span-1 bg-[#fffdf0] dark:bg-slate-900/50 p-6 rounded-2xl border-2 border-slate-200 dark:border-slate-800 shadow-xl relative overflow-hidden"
+          className="lg:col-span-1 bg-[#fffdf0] dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl relative overflow-hidden"
         >
           <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
           
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-black text-slate-900 dark:text-white underline decoration-indigo-500 decoration-4 underline-offset-4">Monthly Summary</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-black text-slate-900 dark:text-white underline decoration-indigo-500 decoration-2 underline-offset-4">Monthly Summary</h3>
             <button 
               onClick={() => setIsSummaryModalOpen(true)}
-              className="text-[10px] font-bold uppercase text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+              className="text-[9px] font-black uppercase text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
             >
-              Manual Entry
+              Manual
             </button>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex justify-between items-center pb-2 border-b-2 border-slate-100 dark:border-slate-800">
-              <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Total Invoiced</span>
-              <span className="text-xl font-black text-slate-900 dark:text-white">
+          <div className="space-y-3">
+            <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/50 dark:border-slate-800">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Total Invoiced</span>
+              <span className="text-base font-black text-slate-900 dark:text-white">
                 {formatCurrency(reportStats.monthlySaleReport?.find((m: any) => m.month === reportMonth)?.total || 0)}
               </span>
             </div>
 
-            <div className="flex justify-between items-center pb-2 border-b-2 border-slate-100 dark:border-slate-800">
-              <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Total Collections</span>
-              <span className="text-xl font-black text-indigo-600">
+            <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/50 dark:border-slate-800">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Collections</span>
+              <span className="text-base font-black text-indigo-600">
                 {formatCurrency((monthlySummary?.sales?.cash || 0) + (monthlySummary?.sales?.upi || 0))}
               </span>
             </div>
 
             <div className="overflow-x-auto no-scrollbar">
-              <table className="w-full text-left border-collapse min-w-[300px]">
+              <table className="w-full text-left border-collapse min-w-[240px]">
                 <thead>
                   <tr>
-                    <th className="py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</th>
-                    <th className="py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Cash</th>
-                    <th className="py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">UPI</th>
+                    <th className="py-1 text-[9px] font-black text-slate-400 uppercase tracking-widest">Type</th>
+                    <th className="py-1 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Cash</th>
+                    <th className="py-1 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">UPI</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   <tr>
-                    <td className="py-3 text-sm font-bold text-slate-700 dark:text-slate-300">Sale In</td>
-                    <td className="py-3 text-sm font-black text-slate-900 dark:text-white text-right">{formatCurrency(monthlySummary?.sales?.cash || 0)}</td>
-                    <td className="py-3 text-sm font-black text-slate-900 dark:text-white text-right">{formatCurrency(monthlySummary?.sales?.upi || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-300">Sales</td>
+                    <td className="py-1.5 text-[11px] font-black text-slate-900 dark:text-white text-right">{formatCurrency(monthlySummary?.sales?.cash || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-slate-900 dark:text-white text-right">{formatCurrency(monthlySummary?.sales?.upi || 0)}</td>
                   </tr>
                   <tr>
-                    <td className="py-3 text-sm font-bold text-slate-700 dark:text-slate-300">Goods</td>
-                    <td className="py-3 text-sm font-black text-rose-600 text-right">-{formatCurrency(monthlySummary?.goods?.cash || 0)}</td>
-                    <td className="py-3 text-sm font-black text-rose-600 text-right">-{formatCurrency(monthlySummary?.goods?.upi || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-300">Goods</td>
+                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(monthlySummary?.goods?.cash || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(monthlySummary?.goods?.upi || 0)}</td>
                   </tr>
                   <tr>
-                    <td className="py-3 text-sm font-bold text-slate-700 dark:text-slate-300">Expenses</td>
-                    <td className="py-3 text-sm font-black text-rose-600 text-right">-{formatCurrency(monthlySummary?.expenses?.cash || 0)}</td>
-                    <td className="py-3 text-sm font-black text-rose-600 text-right">-{formatCurrency(monthlySummary?.expenses?.upi || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-300">Costs</td>
+                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(monthlySummary?.expenses?.cash || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(monthlySummary?.expenses?.upi || 0)}</td>
                   </tr>
                   <tr className="bg-indigo-50/50 dark:bg-indigo-900/20">
-                    <td className="py-3 text-sm font-black text-indigo-600 dark:text-indigo-400">Still Have</td>
-                    <td className="py-3 text-sm font-black text-indigo-600 dark:text-indigo-400 text-right">{formatCurrency(monthlySummary?.stillHave?.cash || 0)}</td>
-                    <td className="py-3 text-sm font-black text-indigo-600 dark:text-indigo-400 text-right">{formatCurrency(monthlySummary?.stillHave?.upi || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase">Net</td>
+                    <td className="py-1.5 text-[11px] font-black text-indigo-600 dark:text-indigo-400 text-right">{formatCurrency(monthlySummary?.stillHave?.cash || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-indigo-600 dark:text-indigo-400 text-right">{formatCurrency(monthlySummary?.stillHave?.upi || 0)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -345,20 +345,20 @@ export default function Reports() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
-          className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm"
+          className="lg:col-span-2 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm"
         >
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Sales Trend ({reportMonth})</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Comparing with {salesData.prevMonthLabel || 'previous month'}</p>
+              <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Sales Trend ({reportMonth})</h3>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">Comparing performance</p>
             </div>
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700">
-              <Calendar size={14} />
-              <span>Monthly Comparison</span>
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-100 dark:border-slate-700">
+              <Calendar size={12} />
+              <span>VS Prev</span>
             </div>
           </div>
           
-          <div className="h-72 w-full">
+          <div className="h-48 w-full">
             {loading ? (
               <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-500">
                 <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
@@ -444,14 +444,14 @@ export default function Reports() {
               </ResponsiveContainer>
             )}
           </div>
-          <div className="mt-6 flex items-center justify-center gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-indigo-600" />
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Current Month</span>
+          <div className="mt-4 flex items-center justify-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-indigo-600" />
+              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Current</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-slate-300 border border-dashed border-slate-400" />
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Previous Month</span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-slate-300 border border-dashed border-slate-400" />
+              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Previous</span>
             </div>
           </div>
         </motion.div>
@@ -461,77 +461,76 @@ export default function Reports() {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.3 }}
-          className="space-y-6"
+          className="space-y-4"
         >
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider">Per Product Profit (Top 5)</p>
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Profits (Top 5)</p>
               <Link 
                 to={`/reports/product-profit?month=${reportMonth}`}
-                className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+                className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
               >
-                <ExternalLink size={14} />
+                <ExternalLink size={12} />
               </Link>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {loading ? (
-                <p className="text-sm text-slate-400">Loading...</p>
+                <p className="text-xs text-slate-400">Loading...</p>
               ) : !Array.isArray(reportStats.perProductProfit) || reportStats.perProductProfit.length === 0 ? (
-                <p className="text-sm text-slate-400 italic">No sales data yet</p>
+                <p className="text-[10px] text-slate-400 italic">No data</p>
               ) : reportStats.perProductProfit.map((p: any, i: number) => (
-                <div key={i} className="flex justify-between items-center">
-                  <span className="text-xs font-medium text-slate-600 dark:text-slate-400 truncate max-w-[120px]">{p.name}</span>
-                  <span className="text-sm font-bold text-emerald-600">{formatCurrency(p.profit)}</span>
+                <div key={i} className="flex justify-between items-center text-[11px]">
+                  <span className="font-bold text-slate-600 dark:text-slate-400 truncate max-w-[100px]">{p.name}</span>
+                  <span className="font-black text-emerald-600">{formatCurrency(p.profit)}</span>
                 </div>
               ))}
             </div>
           </div>
           
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-            <p className="text-xs font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider mb-1">Top Category</p>
-            <h4 className="text-2xl font-bold text-slate-900 dark:text-white">{reportStats.topCategory}</h4>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Most listed category</p>
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Top Category</p>
+            <h4 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-tight">{reportStats.topCategory}</h4>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-            <p className="text-xs font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider mb-3">Account Balances</p>
-            <div className="space-y-3">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Balances</p>
+            <div className="space-y-2">
               {loading ? (
-                <p className="text-sm text-slate-400">Loading...</p>
+                <p className="text-xs text-slate-400">Loading...</p>
               ) : !dashboardStats?.accounts || dashboardStats.accounts.length === 0 ? (
-                <p className="text-sm text-slate-400 italic">No accounts found</p>
+                <p className="text-[10px] text-slate-400 italic">No accounts</p>
               ) : dashboardStats.accounts.map((acc: any, i: number) => (
-                <div key={i} className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
+                <div key={i} className="flex justify-between items-center text-[11px]">
+                  <div className="flex items-center gap-1.5">
                     <div className={cn(
-                      "w-2 h-2 rounded-full",
+                      "w-1.5 h-1.5 rounded-full",
                       acc.type === 'cash' ? "bg-emerald-500" : "bg-indigo-500"
                     )} />
-                    <span className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">{acc.name}</span>
+                    <span className="font-bold text-slate-600 dark:text-slate-400 uppercase tracking-tight">{acc.name}</span>
                   </div>
-                  <span className="text-sm font-bold text-slate-900 dark:text-white">{formatCurrency(acc.balance)}</span>
+                  <span className="font-black text-slate-900 dark:text-white">{formatCurrency(acc.balance)}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-            <p className="text-xs font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider mb-3">Monthly Sale Report</p>
-            <div className="space-y-3">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Recent Months</p>
+            <div className="space-y-1.5">
               {loading ? (
-                <p className="text-sm text-slate-400">Loading...</p>
+                <p className="text-xs text-slate-400">Loading...</p>
               ) : !Array.isArray(reportStats.monthlySaleReport) || reportStats.monthlySaleReport.length === 0 ? (
-                <p className="text-sm text-slate-400 italic">No sales data yet</p>
+                <p className="text-[10px] text-slate-400 italic">No data</p>
               ) : reportStats.monthlySaleReport.map((m: any, i: number) => (
                 <button 
                   key={i} 
                   onClick={() => handleMonthClick(m.month)}
-                  className="w-full flex justify-between items-center p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all group"
+                  className="w-full flex justify-between items-center p-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-all group"
                 >
-                  <span className="text-xs font-medium text-slate-600 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{m.month}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-indigo-600">{formatCurrency(m.total)}</span>
-                    <ChevronRight size={14} className="text-slate-300 group-hover:text-indigo-400" />
+                  <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 group-hover:text-indigo-600 uppercase tracking-tighter">{m.month}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[11px] font-black text-slate-900 dark:text-white">{formatCurrency(m.total)}</span>
+                    <ChevronRight size={12} className="text-slate-300" />
                   </div>
                 </button>
               ))}
@@ -545,19 +544,19 @@ export default function Reports() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.35 }}
-        className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm"
+        className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm"
       >
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Yearly Performance (Last 12 Months)</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Monthly sales trend over the past year</p>
+            <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Yearly Overview</h3>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 italic">12-month trend</p>
           </div>
-          <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400">
-            <TrendingUp size={20} />
+          <div className="p-1.5 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg text-indigo-600">
+            <TrendingUp size={16} />
           </div>
         </div>
         
-        <div className="h-72 w-full">
+        <div className="h-48 w-full">
           {loading ? (
             <div className="w-full h-full flex items-center justify-center">
               <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />

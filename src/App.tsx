@@ -52,13 +52,13 @@ import Login from './pages/Login';
 const SidebarItem = ({ icon: Icon, label, to, active, onClick }: { icon: any, label: string, to: string, active: boolean, onClick?: () => void, key?: string }) => (
   <Link to={to} onClick={onClick}>
     <div className={cn(
-      "flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-all duration-200 group",
+      "flex items-center gap-2 px-2.5 py-2 rounded-md transition-all duration-200 group",
       active 
-        ? "bg-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-indigo-900/20" 
+        ? "bg-indigo-600 text-white shadow-sm shadow-indigo-200 dark:shadow-indigo-900/20" 
         : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
     )}>
-      <Icon size={18} className={cn(active ? "text-white" : "text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300")} />
-      <span className="font-medium text-sm">{label}</span>
+      <Icon size={16} className={cn(active ? "text-white" : "text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300")} />
+      <span className="font-medium text-[13px]">{label}</span>
     </div>
   </Link>
 );
@@ -101,26 +101,26 @@ const Sidebar = ({ isOpen, toggle, logout, business }: { isOpen: boolean, toggle
       {/* Sidebar */}
       <motion.aside
         initial={false}
-        animate={{ x: isOpen ? 0 : -240 }}
+        animate={{ x: isOpen ? 0 : -200 }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
         className={cn(
-          "fixed top-0 left-0 bottom-0 w-[240px] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 z-50 flex flex-col",
+          "fixed top-0 left-0 bottom-0 w-[200px] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 z-50 flex flex-col",
           !isOpen && "pointer-events-none"
         )}
       >
-        <div className="p-5 flex items-center justify-between">
+        <div className="p-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-200 dark:shadow-indigo-900/20">
-              <BarChart3 className="text-white" size={18} />
+            <div className="w-6 h-6 bg-indigo-600 rounded-md flex items-center justify-center shadow-lg shadow-indigo-200 dark:shadow-indigo-900/20">
+              <BarChart3 className="text-white" size={14} />
             </div>
-            <h1 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">BizManager <span className="text-indigo-600">Pro</span></h1>
+            <h1 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">BizManager <span className="text-indigo-600">Pro</span></h1>
           </div>
           <button onClick={toggle} className="xl:hidden text-slate-500 dark:text-slate-400">
-            <X size={20} />
+            <X size={16} />
           </button>
         </div>
 
-        <div className="flex-1 px-3 py-1 space-y-0.5 overflow-y-auto">
+        <div className="flex-1 px-2 py-0.5 space-y-0.5 overflow-y-auto">
           {menuItems.map((item) => (
             <SidebarItem 
               key={item.to} 
@@ -319,24 +319,24 @@ function AppContent() {
       
       <main className={cn(
         "flex-1 flex flex-col min-w-0 transition-all duration-200 ease-out relative z-10",
-        isSidebarOpen ? "xl:ml-[240px]" : "xl:ml-0"
+        isSidebarOpen ? "xl:ml-[200px]" : "xl:ml-0"
       )}>
         {/* Header */}
-        <header className="h-14 bg-white dark:bg-slate-900/80 dark:backdrop-blur-md border-b border-slate-200 dark:border-slate-800/50 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30 transition-colors duration-300">
-          <button onClick={toggleSidebar} className="xl:hidden p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
-            <Menu size={22} />
+        <header className="h-10 bg-white dark:bg-slate-900/80 dark:backdrop-blur-md border-b border-slate-200 dark:border-slate-800/50 flex items-center justify-between px-2.5 lg:px-4 sticky top-0 z-30 transition-colors duration-300">
+          <button onClick={toggleSidebar} className="xl:hidden p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+            <Menu size={18} />
           </button>
           
-          <div className="flex-1 flex items-center px-4">
+          <div className="flex-1 flex items-center px-1.5">
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
             <button 
               onClick={toggleTheme}
-              className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+              className="p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
               title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
             >
-              {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
 
             <button 
@@ -353,16 +353,16 @@ function AppContent() {
                 });
                 setIsPayInModalOpen(true);
               }}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-medium transition-all shadow-md shadow-emerald-100 dark:shadow-emerald-900/20"
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-medium transition-all shadow-md shadow-emerald-100 dark:shadow-emerald-900/20 text-xs"
             >
-              <Wallet size={18} />
+              <Wallet size={14} />
               <span className="hidden sm:inline">Pay In</span>
             </button>
           </div>
         </header>
 
         {/* Content */}
-        <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
+        <div className="flex-1 p-2.5 lg:p-4 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
             <AnimatePresence mode="wait">
               <motion.div

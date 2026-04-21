@@ -65,10 +65,26 @@ export default function Customers() {
     }
   };
 
-  const sendReminder = (customer: Customer) => {
+  const sendReminder = async (customer: Customer) => {
     if (customer.outstanding_balance <= 0) {
       alert('This customer has no outstanding balance.');
       return;
+    }
+
+    let linkMessage = '';
+    try {
+      const invoices = await supabaseService.getCustomerInvoices(customer.id);
+      const pendingInvoices = invoices
+        .filter((inv: any) => inv.payment_status !== 'paid')
+        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      if (pendingInvoices.length > 0) {
+        const latestInvoice = pendingInvoices[0];
+        const publicLink = `${window.location.origin}/public/invoice/${latestInvoice.id}`;
+        linkMessage = `\n\nYou can view your latest invoice here:\n${publicLink}`;
+      }
+    } catch (error) {
+      console.error('Error fetching invoices for reminder:', error);
     }
 
     const message = `*Payment Reminder*
@@ -76,7 +92,7 @@ Hello ${customer.name},
 
 This is a friendly reminder from *${business?.business_name || 'your business'}* regarding your outstanding balance of *${formatCurrency(customer.outstanding_balance)}*.
 
-Kindly clear the dues at your earliest convenience. If you have already made the payment, please ignore this message.
+Kindly clear the dues at your earliest convenience. If you have already made the payment, please ignore this message.${linkMessage}
 
 Thank you!`;
 

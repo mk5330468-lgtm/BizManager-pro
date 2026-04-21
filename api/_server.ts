@@ -1162,6 +1162,17 @@ async function startServer() {
       const day = dateObj.getDate();
       const invoice_number = `${monthAbbr} ${yearShort}-${day}-${nextId}`;
 
+      // Recalculate payment status based on amounts to ensure integrity
+      const finalAmountPaid = Number(amount_paid) || 0;
+      let finalStatus = payment_status;
+      if (finalAmountPaid <= 0) {
+        finalStatus = 'unpaid';
+      } else if (finalAmountPaid < Number(total_amount)) {
+        finalStatus = 'partial';
+      } else {
+        finalStatus = 'paid';
+      }
+
       // 2. Create Invoice
       const invoiceDate = created_at || new Date().toISOString();
       const { data: invoice, error: invError } = await supabase
@@ -1174,9 +1185,9 @@ async function startServer() {
           tax_amount,
           discount_amount,
           total_amount,
-          payment_status,
+          payment_status: finalStatus,
           payment_mode,
-          amount_paid: amount_paid || 0,
+          amount_paid: finalAmountPaid,
           cash_amount: cash_amount || 0,
           upi_amount: upi_amount || 0,
           created_at: invoiceDate,
@@ -1267,7 +1278,12 @@ async function startServer() {
       }
 
       if (customer_id) {
-        tasks.push(updateCustomerBalance(req.businessId, customer_id, paidAmount, 'decrement'));
+        const unpaid = total_amount - paidAmount;
+        if (unpaid > 0) {
+          tasks.push(updateCustomerBalance(req.businessId, customer_id, unpaid, 'increment'));
+        } else if (unpaid < 0) {
+          tasks.push(updateCustomerBalance(req.businessId, customer_id, Math.abs(unpaid), 'decrement'));
+        }
       }
 
       await Promise.all(tasks);
@@ -1406,6 +1422,17 @@ async function startServer() {
         }
       }
 
+      // Recalculate payment status based on amounts to ensure integrity
+      const finalAmountPaid = Number(amount_paid) || 0;
+      let finalStatus = payment_status;
+      if (finalAmountPaid <= 0) {
+        finalStatus = 'unpaid';
+      } else if (finalAmountPaid < Number(total_amount)) {
+        finalStatus = 'partial';
+      } else {
+        finalStatus = 'paid';
+      }
+
       // 2. Update Invoice
       const { error: updateError } = await supabase
         .from('invoices')
@@ -1415,9 +1442,9 @@ async function startServer() {
           tax_amount,
           discount_amount,
           total_amount,
-          payment_status,
+          payment_status: finalStatus,
           payment_mode,
-          amount_paid: amount_paid || 0,
+          amount_paid: finalAmountPaid,
           cash_amount: cash_amount || 0,
           upi_amount: upi_amount || 0,
           created_at,
@@ -1608,33 +1635,33 @@ async function startServer() {
         }
       }
       
-      // Reverse customer balance
+      // Reverse customer balance and account balance
+      const invoiceId = Number(req.params.id);
       const { data: payments } = await supabase
         .from('payments')
-        .select('amount')
-        .eq('invoice_id', req.params.id);
-      
-      const paid = payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
-      const balance = invoice.total_amount - paid;
-      if (balance > 0 && invoice.customer_id) {
-        await updateCustomerBalance(req.businessId, invoice.customer_id, balance, 'decrement');
-      }
-
-      // Reverse account balance for each payment
-      const { data: allPayments } = await supabase
-        .from('payments')
         .select('amount, payment_mode')
-        .eq('invoice_id', req.params.id);
-
-      if (allPayments && allPayments.length > 0) {
-        await Promise.all(allPayments.map(p => 
-          updateAccountBalance(req.businessId, p.payment_mode, p.amount, 'decrement')
-        ));
+        .eq('invoice_id', invoiceId);
+      
+      const paid = payments?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) || 0;
+      const unpaidBalance = Number(invoice.total_amount) - paid;
+      
+      if (invoice.customer_id) {
+        if (unpaidBalance !== 0) {
+          const action = unpaidBalance > 0 ? 'decrement' : 'increment';
+          await updateCustomerBalance(req.businessId, invoice.customer_id, Math.abs(unpaidBalance), action);
+        }
       }
 
-      await supabase.from('invoice_items').delete().eq('invoice_id', req.params.id);
-      await supabase.from('payments').delete().eq('invoice_id', req.params.id);
-      await supabase.from('invoices').delete().eq('id', req.params.id).eq('business_id', req.businessId);
+      // Reverse account balance for each payment and delete them
+      if (payments && payments.length > 0) {
+        for (const p of payments) {
+          await updateAccountBalance(req.businessId, p.payment_mode, p.amount, 'decrement');
+        }
+        await supabase.from('payments').delete().eq('invoice_id', invoiceId);
+      }
+
+      await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId);
+      await supabase.from('invoices').delete().eq('id', invoiceId).eq('business_id', req.businessId);
 
       res.json({ success: true });
     } catch (error: any) {
@@ -2102,7 +2129,10 @@ async function startServer() {
           if (totalPaid > 0) {
             newStatus = totalPaid >= invoice.total_amount ? 'paid' : 'partial';
           }
-          await supabase.from('invoices').update({ payment_status: newStatus }).eq('id', payment.invoice_id);
+          await supabase.from('invoices').update({ 
+            payment_status: newStatus,
+            amount_paid: totalPaid 
+          }).eq('id', payment.invoice_id);
         }
       }
 
@@ -2161,7 +2191,10 @@ async function startServer() {
           if (totalPaid > 0) {
             newStatus = totalPaid >= invoice.total_amount ? 'paid' : 'partial';
           }
-          await supabase.from('invoices').update({ payment_status: newStatus }).eq('id', oldPayment.invoice_id);
+          await supabase.from('invoices').update({ 
+            payment_status: newStatus,
+            amount_paid: totalPaid
+          }).eq('id', oldPayment.invoice_id);
         }
       }
       res.json({ success: true });
@@ -2202,10 +2235,10 @@ async function startServer() {
         return payment;
       };
 
-      if (settlements && Array.isArray(settlements) && settlements.length > 0) {
-        let remainingCash = payment_mode === 'both' ? Number(cash_amount) : (payment_mode === 'cash' ? totalAmount : 0);
-        let remainingUpi = payment_mode === 'both' ? Number(upi_amount) : (payment_mode === 'upi' ? totalAmount : 0);
+      let remainingCash = payment_mode === 'both' ? Number(cash_amount) : (payment_mode === 'cash' ? totalAmount : 0);
+      let remainingUpi = payment_mode === 'both' ? Number(upi_amount) : (payment_mode === 'upi' ? totalAmount : 0);
 
+      if (settlements && Array.isArray(settlements) && settlements.length > 0) {
         for (const settlement of settlements) {
           const { invoice_id, amount: settlementAmount } = settlement;
           let amtToSettle = Number(settlementAmount);
@@ -2228,6 +2261,8 @@ async function startServer() {
             }
           } else {
             results.push(await recordPayment(amtToSettle, payment_mode, invoice_id, `Settlement for invoice #${invoice_id}. ${notes || ''}`));
+            if (payment_mode === 'cash') remainingCash -= amtToSettle;
+            else remainingUpi -= amtToSettle;
           }
 
           // Update invoice status
@@ -2235,32 +2270,37 @@ async function startServer() {
           const { data: payments } = await supabase.from('payments').select('amount').eq('invoice_id', invoice_id);
           const paidSoFar = payments?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) || 0;
           
-          let status = 'partial';
-          if (paidSoFar >= Number(invoice.total_amount)) {
-            status = 'paid';
+          let status = 'unpaid';
+          if (paidSoFar > 0) {
+            status = paidSoFar >= Number(invoice.total_amount) ? 'paid' : 'partial';
           }
-          await supabase.from('invoices').update({ payment_status: status }).eq('id', invoice_id);
-        }
-
-        // Handle remaining amounts as general payments
-        if (remainingCash > 0) {
-          results.push(await recordPayment(remainingCash, 'cash', undefined, `General payment (Cash). ${notes || ''}`));
-        }
-        if (remainingUpi > 0) {
-          results.push(await recordPayment(remainingUpi, 'upi', undefined, `General payment (UPI). ${notes || ''}`));
-        }
-      } else {
-        // No settlements, just record general payment(s)
-        if (payment_mode === 'both') {
-          results.push(await recordPayment(Number(cash_amount), 'cash', undefined, `General payment (Cash). ${notes || ''}`));
-          results.push(await recordPayment(Number(upi_amount), 'upi', undefined, `General payment (UPI). ${notes || ''}`));
-        } else {
-          results.push(await recordPayment(totalAmount, payment_mode, undefined, notes));
+          
+          await supabase.from('invoices').update({ 
+            payment_status: status,
+            amount_paid: paidSoFar
+          }).eq('id', invoice_id);
         }
       }
 
-      // 2. Update Customer Balance
-      await updateCustomerBalance(req.businessId, customer_id, totalAmount, 'decrement');
+      // Handle general payments (if no settlements were provided OR if there are remaining amounts)
+      if (payment_mode === 'both') {
+        if (remainingCash > 0) {
+          results.push(await recordPayment(remainingCash, 'cash', undefined, notes));
+        }
+        if (remainingUpi > 0) {
+          results.push(await recordPayment(remainingUpi, 'upi', undefined, notes));
+        }
+      } else {
+        const leftover = payment_mode === 'cash' ? remainingCash : remainingUpi;
+        if (leftover > 0) {
+          results.push(await recordPayment(leftover, payment_mode, undefined, notes));
+        }
+      }
+
+      // Update customer's total outstanding balance (always if customer_id is provided)
+      if (customer_id && totalAmount > 0) {
+        await updateCustomerBalance(req.businessId, customer_id, totalAmount, 'decrement');
+      }
 
       res.json(results[0] || { success: true });
     } catch (error: any) {

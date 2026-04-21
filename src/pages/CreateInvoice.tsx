@@ -67,7 +67,7 @@ export default function CreateInvoice() {
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [discount, setDiscount] = useState(0);
   const [amountPaid, setAmountPaid] = useState<number | ''>('');
-  const [paymentStatus, setPaymentStatus] = useState<'paid' | 'unpaid' | 'partial'>('paid');
+  const [paymentStatus, setPaymentStatus] = useState<'paid' | 'unpaid' | 'partial' | ''>('');
   const [paymentMode, setPaymentMode] = useState<'cash' | 'upi' | 'both' | ''>('cash');
   const [cashAmount, setCashAmount] = useState<number | ''>('');
   const [upiAmount, setUpiAmount] = useState<number | ''>('');
@@ -237,6 +237,14 @@ export default function CreateInvoice() {
   const taxAmount = lineItems.reduce((sum, item) => sum + (item.total * item.tax_percentage / 100), 0);
   const totalAmount = subtotal + taxAmount - discount;
 
+  useEffect(() => {
+    if (paymentStatus === 'paid') {
+      setAmountPaid(totalAmount);
+    } else if (paymentStatus === 'unpaid') {
+      setAmountPaid(0);
+    }
+  }, [totalAmount, paymentStatus]);
+
   const handleShareWhatsApp = () => {
     if (!savedInvoiceData) return;
     
@@ -265,6 +273,7 @@ Thank you for your business!`;
 
   const handleSave = async () => {
     if (lineItems.length === 0) return alert('Please add at least one item');
+    if (!paymentStatus) return alert('Please select a payment status');
 
     setLoading(true);
     try {
@@ -280,6 +289,10 @@ Thank you for your business!`;
         finalCreatedAt = new Date(selectedDate.setHours(0, 0, 0, 0)).toISOString();
       }
 
+      const finalAmountPaid = paymentMode === 'both' 
+        ? (Number(cashAmount) || 0) + (Number(upiAmount) || 0)
+        : (Number(amountPaid) || 0);
+
       const invoiceData = {
         customer_id: selectedCustomerId || null,
         items: lineItems,
@@ -292,7 +305,7 @@ Thank you for your business!`;
         cash_amount: paymentMode === 'both' ? Number(cashAmount) || 0 : undefined,
         upi_amount: paymentMode === 'both' ? Number(upiAmount) || 0 : undefined,
         created_at: finalCreatedAt,
-        amount_paid: Number(amountPaid) || 0
+        amount_paid: finalAmountPaid
       };
 
       let savedInvoice;
@@ -872,88 +885,137 @@ Thank you for your business!`;
               </div>
             </div>
 
-            <div className="space-y-4 mb-4">
+            <div className="space-y-4 mb-4 font-sans">
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Payment</label>
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Payment Status</label>
                 <div className="grid grid-cols-3 gap-1.5">
                   {[
-                    { id: 'cash', label: 'Cash', icon: Banknote },
-                    { id: 'upi', label: 'UPI', icon: Smartphone },
-                    { id: 'both', label: 'Both', icon: Calculator }
-                  ].map(mode => (
+                    { id: 'paid', label: 'Paid' },
+                    { id: 'partial', label: 'Partial' },
+                    { id: 'unpaid', label: 'Pending' }
+                  ].map(status => (
                     <button 
-                      key={mode.id}
-                      onClick={() => setPaymentMode(mode.id as any)}
+                      key={status.id}
+                      type="button"
+                      onClick={() => {
+                        setPaymentStatus(status.id as any);
+                        if (status.id === 'paid') {
+                          setAmountPaid(totalAmount);
+                        } else if (status.id === 'unpaid') {
+                          setAmountPaid(0);
+                          setCashAmount(0);
+                          setUpiAmount(0);
+                        }
+                      }}
                       className={cn(
-                        "py-2 rounded-lg text-[9px] font-black uppercase tracking-tight border transition-all flex flex-col items-center justify-center gap-1",
-                        paymentMode === mode.id 
+                        "py-2 rounded-lg text-[9px] font-black uppercase tracking-tight border transition-all",
+                        paymentStatus === status.id 
                           ? "bg-indigo-600 border-indigo-600 text-white shadow-lg" 
                           : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500"
                       )}
                     >
-                      <mode.icon size={12} />
-                      {mode.label}
+                      {status.label}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {paymentMode && (
+              {paymentStatus && paymentStatus !== 'unpaid' && (
                 <motion.div 
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="space-y-3 overflow-hidden"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800"
                 >
-                  {paymentMode === 'both' ? (
-                    <div className="grid grid-cols-1 gap-2">
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Cash</label>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Payment Mode</label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[
+                        { id: 'cash', label: 'Cash', icon: Banknote },
+                        { id: 'upi', label: 'UPI', icon: Smartphone },
+                        { id: 'both', label: 'Both', icon: Calculator }
+                      ].map(mode => (
+                        <button 
+                          key={mode.id}
+                          type="button"
+                          onClick={() => setPaymentMode(mode.id as any)}
+                          className={cn(
+                            "py-2 rounded-lg text-[9px] font-black uppercase tracking-tight border transition-all flex flex-col items-center justify-center gap-1",
+                            paymentMode === mode.id 
+                              ? "bg-indigo-600 border-indigo-600 text-white shadow-lg" 
+                              : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500"
+                          )}
+                        >
+                          <mode.icon size={12} />
+                          {mode.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {paymentMode === 'both' ? (
+                      <div className="grid grid-cols-1 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Cash</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">₹</span>
+                            <input 
+                              type="number" 
+                              className="w-full pl-7 pr-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none dark:text-white font-bold text-xs"
+                              value={cashAmount === 0 ? '0' : cashAmount}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? '' : Number(e.target.value);
+                                setCashAmount(val);
+                                // Automatically update status if amount changes
+                                if (Number(val) + Number(upiAmount) >= totalAmount) setPaymentStatus('paid');
+                                else if (Number(val) + Number(upiAmount) > 0) setPaymentStatus('partial');
+                                else setPaymentStatus('unpaid');
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">UPI</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">₹</span>
+                            <input 
+                              type="number" 
+                              className="w-full pl-7 pr-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none dark:text-white font-bold text-xs"
+                              value={upiAmount === 0 ? '0' : upiAmount}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? '' : Number(e.target.value);
+                                setUpiAmount(val);
+                                // Automatically update status
+                                if (Number(val) + Number(cashAmount) >= totalAmount) setPaymentStatus('paid');
+                                else if (Number(val) + Number(cashAmount) > 0) setPaymentStatus('partial');
+                                else setPaymentStatus('unpaid');
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Received Amount</label>
                         <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">₹</span>
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 font-black text-sm">₹</span>
                           <input 
                             type="number" 
-                            className="w-full pl-7 pr-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none dark:text-white font-bold text-xs"
-                            value={cashAmount === 0 ? '0' : cashAmount}
+                            className="w-full pl-8 pr-2 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:border-indigo-500 outline-none font-black text-base text-indigo-600 dark:text-indigo-400 transition-all"
+                            value={amountPaid === 0 ? '0' : amountPaid || ''}
                             onChange={(e) => {
                               const val = e.target.value === '' ? '' : Number(e.target.value);
-                              setCashAmount(val);
+                              setAmountPaid(val);
+                              // Automatically update status
+                              if (Number(val) >= totalAmount) setPaymentStatus('paid');
+                              else if (Number(val) > 0) setPaymentStatus('partial');
+                              else setPaymentStatus('unpaid');
                             }}
                           />
                         </div>
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">UPI</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">₹</span>
-                          <input 
-                            type="number" 
-                            className="w-full pl-7 pr-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none dark:text-white font-bold text-xs"
-                            value={upiAmount === 0 ? '0' : upiAmount}
-                            onChange={(e) => {
-                              const val = e.target.value === '' ? '' : Number(e.target.value);
-                              setUpiAmount(val);
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Received</label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 font-black text-sm">₹</span>
-                        <input 
-                          type="number" 
-                          className="w-full pl-8 pr-2 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:border-indigo-500 outline-none font-black text-base text-indigo-600 dark:text-indigo-400 transition-all"
-                          value={amountPaid === 0 ? '0' : amountPaid || ''}
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? '' : Number(e.target.value);
-                            setAmountPaid(val);
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </motion.div>
               )}
             </div>

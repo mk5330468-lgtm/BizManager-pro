@@ -20,9 +20,33 @@ export const getInvoiceHTML = (invoice: Invoice, business: any) => {
     return '';
   };
 
+  const renderStatusStamp = () => {
+    const status = invoice.payment_status || 'unpaid';
+    const isPaid = status === 'paid';
+    const isPartial = status === 'partial';
+    
+    let color = '#ef4444'; // Red for pending/unpaid
+    let text = 'PENDING';
+    
+    if (isPaid) {
+      color = '#10b981'; // Green for paid
+      text = 'PAID';
+    } else if (isPartial) {
+      color = '#f59e0b'; // Amber for partial
+      text = 'PARTIAL';
+    }
+
+    return `
+      <div style="position: absolute; top: 20px; left: 20px; border: 4px double ${color}; color: ${color}; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 900; font-size: 10px; text-transform: uppercase; transform: rotate(-15deg); opacity: 0.8; z-index: 10; font-family: 'Inter', sans-serif; pointer-events: none; user-select: none; text-align: center; line-height: 1.1;">
+        ${text}
+      </div>
+    `;
+  };
+
   if (theme === 'thermal') {
     return `
-      <div style="font-family: 'Courier New', Courier, monospace; width: 280px; padding: 15px; background: white; color: black; font-size: 11px; line-height: 1.4; margin: 0 auto;">
+      <div style="font-family: 'Courier New', Courier, monospace; width: 280px; padding: 15px; background: white; color: black; font-size: 11px; line-height: 1.4; margin: 0 auto; position: relative;">
+        ${renderStatusStamp()}
         <div style="text-align: center; margin-bottom: 10px;">
           <p style="font-weight: 900; font-size: 14px; margin: 0; text-transform: uppercase;">${business?.business_name}</p>
           <p style="margin: 2px 0;">${business?.address}</p>
@@ -98,7 +122,8 @@ export const getInvoiceHTML = (invoice: Invoice, business: any) => {
 
   if (theme === 'modern') {
     return `
-      <div style="font-family: 'Inter', sans-serif; width: 794px; min-height: 1123px; padding: 60px; background: white; color: #1e293b; box-sizing: border-box;">
+      <div style="font-family: 'Inter', sans-serif; width: 794px; min-height: 1123px; padding: 60px; background: white; color: #1e293b; box-sizing: border-box; position: relative;">
+        ${renderStatusStamp()}
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 80px;">
           <div>
             ${business?.logo_url ? `<img src="${business.logo_url}" style="height: 80px; margin-bottom: 30px; object-fit: contain;" />` : '<div style="height: 60px; width: 60px; background: #0f172a; border-radius: 12px; margin-bottom: 30px;"></div>'}
@@ -201,7 +226,8 @@ export const getInvoiceHTML = (invoice: Invoice, business: any) => {
 
   // Default GST Theme (Tally Style)
   return `
-    <div style="font-family: 'Inter', sans-serif; width: 794px; min-height: 1123px; padding: 40px; background: white; color: #000; box-sizing: border-box; border: 1px solid #000;">
+    <div style="font-family: 'Inter', sans-serif; width: 794px; min-height: 1123px; padding: 40px; background: white; color: #000; box-sizing: border-box; border: 1px solid #000; position: relative;">
+      ${renderStatusStamp()}
       <div style="text-align: center; border-bottom: 1px solid #000; padding-bottom: 10px; margin-bottom: 0;">
         <h1 style="font-size: 20px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: 2px;">Tax Invoice</h1>
       </div>

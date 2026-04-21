@@ -7,6 +7,7 @@ import {
   Share2, 
   Printer,
   Eye,
+  Smartphone,
   CheckCircle2,
   Clock,
   AlertCircle,
@@ -30,6 +31,7 @@ export default function Invoices() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'partial' | 'unpaid'>('all');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'preview'>('list');
   const [business, setBusiness] = useState<any>(null);
@@ -165,6 +167,35 @@ Thank you for your business!`;
     }
   };
 
+  const sendReminder = (invoice: Invoice) => {
+    try {
+      const publicLink = `${window.location.origin}/public/invoice/${invoice.id}`;
+      
+      if (!invoice.customer_phone) {
+        alert('Customer phone number is missing. Cannot send reminder via WhatsApp.');
+        return;
+      }
+
+      const message = `*Payment Reminder*
+Hello ${invoice.customer_name || 'Customer'},
+
+This is a gentle reminder regarding your invoice *${invoice.invoice_number}* for *${formatCurrency(invoice.total_amount)}*, which is currently *${invoice.payment_status?.toUpperCase()}*.
+
+You can view the details and download it here:
+${publicLink}
+
+Kindly settle the balance at your earliest convenience.
+
+Thank you!`;
+      
+      window.open(formatWhatsAppLink(invoice.customer_phone, message), '_blank');
+    } catch (error) {
+      console.error('Error sending reminder:', error);
+      const message = `Payment Reminder: Your invoice ${invoice.invoice_number} for ${formatCurrency(invoice.total_amount)} is pending.`;
+      window.open(formatWhatsAppLink(invoice.customer_phone, message), '_blank');
+    }
+  };
+
   const handleViewInvoice = async (invoice: Invoice) => {
     if (!invoice.items || invoice.items.length === 0) {
       try {
@@ -234,10 +265,12 @@ Thank you for your business!`;
     );
   }
 
-  const filteredInvoices = invoices.filter(i => 
-    (i.invoice_number || '').toLowerCase().includes((searchTerm || '').toLowerCase()) || 
-    (i.customer_name || '').toLowerCase().includes((searchTerm || '').toLowerCase())
-  );
+  const filteredInvoices = invoices.filter(i => {
+    const matchesSearch = (i.invoice_number || '').toLowerCase().includes((searchTerm || '').toLowerCase()) || 
+                         (i.customer_name || '').toLowerCase().includes((searchTerm || '').toLowerCase());
+    const matchesStatus = statusFilter === 'all' || i.payment_status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const StatusBadge = ({ status }: { status: string }) => {
     const styles = {
@@ -255,7 +288,7 @@ Thank you for your business!`;
     return (
       <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border", styles)}>
         <Icon size={14} />
-        <span className="capitalize">{status}</span>
+        <span className="capitalize">{status === 'unpaid' ? 'pending' : status}</span>
       </span>
     );
   };
@@ -280,15 +313,39 @@ Thank you for your business!`;
         animate={{ opacity: 1, y: 0 }}
         className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm"
       >
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search invoices..." 
-            className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white transition-all text-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
+            <input 
+              type="text" 
+              placeholder="Search invoices..." 
+              className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:text-white transition-all text-sm"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'paid', label: 'Paid' },
+              { id: 'partial', label: 'Partial' },
+              { id: 'unpaid', label: 'Pending' }
+            ].map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setStatusFilter(f.id as any)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border whitespace-nowrap",
+                  statusFilter === f.id 
+                    ? "bg-indigo-600 border-indigo-600 text-white shadow-lg" 
+                    : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-indigo-500"
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
       </motion.div>
 
@@ -352,6 +409,11 @@ Thank you for your business!`;
                           <button onClick={() => shareOnWhatsApp(invoice)} className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-md transition-all" title="Share">
                             <Share2 size={13} />
                           </button>
+                          {invoice.payment_status !== 'paid' && (
+                            <button onClick={() => sendReminder(invoice)} className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-md transition-all" title="Send Reminder">
+                              <Smartphone size={13} />
+                            </button>
+                          )}
                           <button onClick={() => generateInvoicePDF(invoice, 'download')} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-md transition-all" title="Download">
                             <Download size={13} />
                           </button>

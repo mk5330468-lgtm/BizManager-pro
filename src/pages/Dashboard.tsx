@@ -473,9 +473,24 @@ export default function Dashboard() {
                         <p className="font-bold text-rose-600 dark:text-rose-400 text-[13px]">{formatCurrency(customer.outstanding_balance)}</p>
                       </div>
                       <button 
-                        onClick={() => {
-                          const appUrl = window.location.origin;
-                          const message = `Dear ${customer.name}, your payment of ${formatCurrency(customer.outstanding_balance)} is pending with BizManager Pro.\nPlease find your digital invoice details at ${appUrl}/invoices for your reference.\nWe request you to settle the balance via UPI or Cash at your earliest convenience.\nThank you for your continued business and support!`;
+                        onClick={async () => {
+                          let linkMessage = '';
+                          try {
+                            const invoices = await supabaseService.getCustomerInvoices(customer.id);
+                            const pendingInvoices = invoices
+                              .filter((inv: any) => inv.payment_status !== 'paid')
+                              .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                            
+                            if (pendingInvoices.length > 0) {
+                              const latestInvoice = pendingInvoices[0];
+                              const publicLink = `${window.location.origin}/public/invoice/${latestInvoice.id}`;
+                              linkMessage = `\n\nYou can view your latest invoice here:\n${publicLink}`;
+                            }
+                          } catch (error) {
+                            console.error('Error fetching invoices for reminder:', error);
+                          }
+
+                          const message = `Dear ${customer.name}, your payment of ${formatCurrency(customer.outstanding_balance)} is pending with BizManager Pro.${linkMessage}\n\nWe request you to settle the balance via UPI or Cash at your earliest convenience.\nThank you for your continued business and support!`;
                           window.open(formatWhatsAppLink(customer.phone, message), '_blank');
                         }}
                         className="p-1.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all shadow-sm"

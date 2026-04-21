@@ -253,9 +253,17 @@ export default function Payments() {
                         <div className="flex items-center justify-end gap-1">
                           <button 
                             onClick={() => handleEdit(payment)}
-                            className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white rounded transition-colors"
+                            className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 rounded transition-colors"
+                            title="Edit Payment"
                           >
                             <Edit2 size={14} />
+                          </button>
+                          <button 
+                            onClick={() => handleDelete(payment.id)}
+                            className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-white dark:hover:bg-slate-800 rounded transition-colors"
+                            title="Delete Payment"
+                          >
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </td>

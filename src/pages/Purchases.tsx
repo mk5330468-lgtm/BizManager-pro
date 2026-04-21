@@ -56,7 +56,7 @@ export default function Purchases() {
     amount_paid: 0,
     balance_due: 0,
     payment_status: 'unpaid' as 'paid' | 'unpaid' | 'partial',
-    payment_mode: 'cash' as 'cash' | 'upi',
+    payment_mode: 'cash' as 'cash' | 'upi' | 'both',
     items: [] as { product_id: number, name: string, quantity: number, price: number, total: number }[]
   });
 
@@ -64,7 +64,7 @@ export default function Purchases() {
     category: '',
     description: '',
     amount: 0,
-    payment_mode: 'cash' as 'cash' | 'upi',
+    payment_mode: 'cash' as 'cash' | 'upi' | 'both',
     expense_date: new Date().toISOString().split('T')[0]
   });
 

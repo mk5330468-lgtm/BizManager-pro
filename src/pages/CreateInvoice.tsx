@@ -68,7 +68,7 @@ export default function CreateInvoice() {
   const [discount, setDiscount] = useState(0);
   const [amountPaid, setAmountPaid] = useState<number | ''>('');
   const [paymentStatus, setPaymentStatus] = useState<'paid' | 'unpaid' | 'partial'>('paid');
-  const [paymentMode, setPaymentMode] = useState<'cash' | 'upi' | 'both' | ''>('');
+  const [paymentMode, setPaymentMode] = useState<'cash' | 'upi' | 'both' | ''>('cash');
   const [cashAmount, setCashAmount] = useState<number | ''>('');
   const [upiAmount, setUpiAmount] = useState<number | ''>('');
   const { user } = useAuth();
@@ -297,8 +297,7 @@ Thank you for your business!`;
 
       let savedInvoice;
       if (id) {
-        await supabaseService.updateInvoice(Number(id), invoiceData);
-        savedInvoice = await supabaseService.getInvoice(Number(id));
+        savedInvoice = await supabaseService.updateInvoice(Number(id), invoiceData);
       } else {
         savedInvoice = await supabaseService.createInvoice(invoiceData);
       }
@@ -315,11 +314,7 @@ Thank you for your business!`;
 
       setSavedInvoiceData(fullInvoice);
       
-      // Generate and upload files (PDF and PNG) to Supabase Storage
-      // We don't await this to reduce processing time for the user
-      invoiceFileService.generateAndUploadFiles(fullInvoice, user!.id)
-        .then(() => console.log('Files uploaded successfully'))
-        .catch(fileError => console.error('Failed to generate/upload invoice files:', fileError));
+      // Note: Backend handles PDF/PNG generation in the background automatically
       
       // Navigate to invoices list and open preview in the same tab
       navigate('/invoices', { state: { previewInvoiceId: fullInvoice.id } });

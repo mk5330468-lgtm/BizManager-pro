@@ -1,6 +1,131 @@
 import { Invoice } from '../types';
 import { formatCurrency } from './utils';
 
+export const getPurchaseHTML = (purchase: any, business: any) => {
+  const themeColor = business?.invoice_theme_color || '#4f46e5';
+
+  return `
+    <div style="font-family: 'Inter', sans-serif; width: 794px; min-height: 1123px; padding: 40px; background: white; color: #000; box-sizing: border-box; border: 1px solid #000; position: relative;">
+      <div style="text-align: center; border-bottom: 1px solid #000; padding-bottom: 10px; margin-bottom: 0;">
+        <h1 style="font-size: 20px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: 2px;">Purchase Record</h1>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid #000;">
+        <div style="padding: 15px; border-right: 1px solid #000;">
+          <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
+            ${business?.logo_url ? `<img src="${business.logo_url}" style="height: 50px;" />` : ''}
+            <h2 style="font-size: 18px; font-weight: 900; margin: 0;">${business?.business_name}</h2>
+          </div>
+          <p style="font-size: 12px; margin: 2px 0; line-height: 1.4;">${business?.address || 'N/A'}</p>
+          <p style="font-size: 12px; margin: 5px 0;"><b>Contact:</b> ${business?.phone || 'N/A'}</p>
+        </div>
+        <div style="display: grid; grid-template-rows: 1fr 1fr;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid #000;">
+            <div style="padding: 10px; border-right: 1px solid #000;">
+              <p style="font-size: 10px; margin: 0; color: #666;">Purchase No.</p>
+              <p style="font-size: 12px; font-weight: 900; margin: 2px 0;">#${purchase.purchase_number || purchase.id}</p>
+            </div>
+            <div style="padding: 10px;">
+              <p style="font-size: 10px; margin: 0; color: #666;">Dated</p>
+              <p style="font-size: 12px; font-weight: 900; margin: 2px 0;">${new Date(purchase.purchase_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+            </div>
+          </div>
+          <div style="padding: 10px;">
+            <p style="font-size: 10px; margin: 0; color: #666;">Supplier Invoice No.</p>
+            <p style="font-size: 12px; font-weight: 900; margin: 2px 0;">${purchase.invoice_number || 'N/A'}</p>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding: 15px; border-bottom: 1px solid #000;">
+        <p style="font-size: 10px; margin: 0; color: #666;">Supplier (Purchase From)</p>
+        <p style="font-size: 14px; font-weight: 900; margin: 5px 0;">${purchase.supplier_name}</p>
+      </div>
+
+      <table style="width: 100%; border-collapse: collapse; border-bottom: 1px solid #000;">
+        <thead>
+          <tr style="border-bottom: 1px solid #000;">
+            <th style="border-right: 1px solid #000; padding: 8px; font-size: 11px; text-align: center; width: 40px;">Sl No.</th>
+            <th style="border-right: 1px solid #000; padding: 8px; font-size: 11px; text-align: left;">Description of Items</th>
+            <th style="border-right: 1px solid #000; padding: 8px; font-size: 11px; text-align: center; width: 80px;">Quantity</th>
+            <th style="border-right: 1px solid #000; padding: 8px; font-size: 11px; text-align: center; width: 100px;">Rate</th>
+            <th style="padding: 8px; font-size: 11px; text-align: right; width: 120px;">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${purchase.items?.map((item: any, i: number) => `
+            <tr style="page-break-inside: avoid;">
+              <td style="border-right: 1px solid #000; padding: 8px; font-size: 12px; text-align: center; vertical-align: top;">${i + 1}</td>
+              <td style="border-right: 1px solid #000; padding: 8px; font-size: 12px; vertical-align: top;">
+                <p style="font-weight: 700; margin: 0;">${item.name || item.product_name || 'Product'}</p>
+              </td>
+              <td style="border-right: 1px solid #000; padding: 8px; font-size: 12px; text-align: center; vertical-align: top;"><b>${item.quantity}</b></td>
+              <td style="border-right: 1px solid #000; padding: 8px; font-size: 12px; text-align: right; vertical-align: top;">${item.price.toFixed(2)}</td>
+              <td style="padding: 8px; font-size: 12px; text-align: right; font-weight: 900; vertical-align: top;">${item.total.toFixed(2)}</td>
+            </tr>
+          `).join('') || `<tr><td colspan="5" style="padding: 20px; text-align: center; color: #666;">No items recorded</td></tr>`}
+          ${Array(Math.max(0, 8 - (purchase.items?.length || 0))).fill(0).map(() => `
+            <tr>
+              <td style="border-right: 1px solid #000; padding: 15px;"></td>
+              <td style="border-right: 1px solid #000; padding: 15px;"></td>
+              <td style="border-right: 1px solid #000; padding: 15px;"></td>
+              <td style="border-right: 1px solid #000; padding: 15px;"></td>
+              <td style="padding: 15px;"></td>
+            </tr>
+          `).join('')}
+        </tbody>
+        <tfoot>
+          <tr style="border-top: 1px solid #000;">
+            <td colspan="3" style="border-right: 1px solid #000; padding: 8px; text-align: right; font-size: 11px; font-weight: 900;">Summary</td>
+            <td style="border-right: 1px solid #000;"></td>
+            <td style="padding: 8px; text-align: right; font-size: 12px; font-weight: 900;">${formatCurrency(purchase.total_amount)}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div style="display: grid; grid-template-columns: 1.5fr 1fr; border-bottom: 1px solid #000;">
+        <div style="padding: 15px; border-right: 1px solid #000;">
+          <p style="font-size: 11px; margin: 0 0 10px 0;">Payment Details</p>
+          <p style="font-size: 12px; margin: 2px 0;"><b>Status:</b> ${purchase.payment_status?.toUpperCase()}</p>
+          <p style="font-size: 12px; margin: 2px 0;"><b>Mode:</b> ${purchase.payment_mode?.toUpperCase()}</p>
+        </div>
+        <div style="padding: 15px; text-align: right;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px;">
+            <span>Subtotal:</span>
+            <span>${formatCurrency(purchase.subtotal)}</span>
+          </div>
+          ${purchase.discount_amount > 0 ? `
+          <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px; color: #ef4444;">
+            <span>Discount:</span>
+            <span>-${formatCurrency(purchase.discount_amount)}</span>
+          </div>` : ''}
+          ${purchase.additional_charges > 0 ? `
+          <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px;">
+            <span>Add. Charges:</span>
+            <span>+${formatCurrency(purchase.additional_charges)}</span>
+          </div>` : ''}
+          <div style="border-top: 1px solid #000; padding-top: 10px;">
+            <p style="font-size: 10px; margin: 0; color: #666;">Grand Total</p>
+            <p style="font-size: 24px; font-weight: 900; margin: 0; color: ${themeColor};">${formatCurrency(purchase.total_amount)}</p>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 11px;">
+            <span>Paid:</span>
+            <span style="font-weight: 700;">${formatCurrency(purchase.amount_paid || 0)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 11px;">
+            <span>Balance:</span>
+            <span style="font-weight: 900; color: #ef4444;">${formatCurrency(purchase.balance_due || 0)}</span>
+          </div>
+        </div>
+      </div>
+      
+      <div style="text-align: center; padding: 20px; font-size: 10px; color: #666;">
+        THIS IS A SYSTEM GENERATED PURCHASE RECORD
+      </div>
+    </div>
+  `;
+};
+
 export const getInvoiceHTML = (invoice: Invoice, business: any) => {
   const theme = business?.invoice_theme || 'gst';
   const themeColor = business?.invoice_theme_color || '#4f46e5';

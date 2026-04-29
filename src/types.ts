@@ -10,7 +10,20 @@ export interface User {
 
 export interface Customer {
   id: number;
-  business_id: number;
+  business_id: string; // Changed from number to string to match UUID
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  gst_number: string;
+  outstanding_balance: number;
+  notes?: string;
+  created_at: string;
+}
+
+export interface Supplier {
+  id: number;
+  business_id: string;
   name: string;
   phone: string;
   email: string;
@@ -67,6 +80,8 @@ export interface Invoice {
   discount_amount: number;
   total_amount: number;
   amount_paid?: number;
+  cash_amount?: number;
+  upi_amount?: number;
   payment_status: 'paid' | 'unpaid' | 'partial';
   payment_mode: 'cash' | 'upi' | 'both';
   pdf_url?: string;
@@ -88,6 +103,7 @@ export interface Purchase {
   id: number;
   business_id: number;
   purchase_number: string;
+  supplier_id?: number;
   supplier_name: string;
   invoice_number: string;
   subtotal: number;
@@ -96,6 +112,8 @@ export interface Purchase {
   additional_charges: number;
   total_amount: number;
   amount_paid?: number;
+  cash_amount?: number;
+  upi_amount?: number;
   balance_due: number;
   payment_status: 'paid' | 'unpaid' | 'partial';
   payment_mode: 'cash' | 'upi' | 'both';
@@ -108,6 +126,8 @@ export interface Expense {
   category: string;
   description: string;
   amount: number;
+  cash_amount?: number;
+  upi_amount?: number;
   payment_mode: 'cash' | 'upi' | 'both';
   expense_date: string;
 }

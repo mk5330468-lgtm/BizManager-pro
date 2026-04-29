@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Wallet, 
   Search, 
@@ -35,8 +36,14 @@ interface Payment {
 }
 
 export default function Payments() {
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  
+  const { data: payments = [], isLoading: loading, refetch: fetchPayments } = useQuery({
+    queryKey: ['payments'],
+    queryFn: () => supabaseService.getPayments(),
+    staleTime: 1000 * 60 * 5,
+  });
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState('all');
   const [customerFilter, setCustomerFilter] = useState('walkin');
@@ -53,23 +60,10 @@ export default function Payments() {
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
-    fetchPayments();
-    
     const handleRefresh = () => fetchPayments();
     window.addEventListener('refresh-data', handleRefresh);
     return () => window.removeEventListener('refresh-data', handleRefresh);
-  }, []);
-
-  const fetchPayments = async () => {
-    try {
-      const data = await supabaseService.getPayments();
-      setPayments(data);
-    } catch (error) {
-      console.error('Error fetching payments:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [fetchPayments]);
 
   const handleDelete = async (id: number) => {
     setPaymentToDelete(id);
@@ -83,12 +77,16 @@ export default function Payments() {
     try {
       await supabaseService.deletePayment(paymentToDelete);
       fetchPayments();
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      
       window.dispatchEvent(new CustomEvent('refresh-data'));
       setIsDeleteModalOpen(false);
       setPaymentToDelete(null);
     } catch (error) {
       console.error('Error deleting payment:', error);
-      // We could add a toast here, but for now let's just log it
     } finally {
       setActionLoading(false);
     }
@@ -113,7 +111,14 @@ export default function Payments() {
     try {
       await supabaseService.updatePayment(editingPayment.id, editForm);
       setIsEditModalOpen(false);
-      fetchPayments();
+      
+      // Invalidate all related queries
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+      
       window.dispatchEvent(new CustomEvent('refresh-data'));
     } catch (error) {
       console.error('Error updating payment:', error);

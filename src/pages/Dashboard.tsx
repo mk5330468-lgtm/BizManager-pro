@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   TrendingUp, 
   Users, 
@@ -56,43 +57,32 @@ const StatCard = ({ title, value, icon: Icon, color, trend, onClick }: { title: 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [showTodayModal, setShowTodayModal] = useState(false);
   const [showMonthlyModal, setShowMonthlyModal] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      if (!stats) setLoading(true);
-      setError(null);
-      try {
-        const statsData = await supabaseService.getDashboardStats();
-        setStats(statsData as any);
-      } catch (err: any) {
-        console.error('Error fetching dashboard data:', err);
-        setError(err.message || 'Failed to load dashboard data');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStats();
+  const { data: stats, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ['dashboardStats'],
+    queryFn: () => supabaseService.getDashboardStats(),
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
 
-    // Listen for global data refresh events
+  const error = queryError instanceof Error ? queryError.message : (queryError as any)?.message || null;
+
+  useEffect(() => {
     const handleRefresh = () => {
-      fetchStats();
+      refetch();
     };
     window.addEventListener('refresh-data', handleRefresh);
     return () => window.removeEventListener('refresh-data', handleRefresh);
-  }, []);
+  }, [refetch]);
 
   const handleSyncBalances = async () => {
     setIsSyncing(true);
     try {
       await supabaseService.syncAccounts();
-      const statsData = await supabaseService.getDashboardStats();
-      setStats(statsData as any);
+      await refetch();
       alert('Balances synchronized successfully!');
     } catch (err: any) {
       console.error('Error syncing balances:', err);
@@ -102,7 +92,11 @@ export default function Dashboard() {
     }
   };
 
-  if (loading) return <div className="flex items-center justify-center h-64">Loading...</div>;
+  if (loading && !stats) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-10 h-10 border-4 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin" />
+    </div>
+  );
 
   const paymentIcons: Record<string, any> = {
     cash: Banknote,

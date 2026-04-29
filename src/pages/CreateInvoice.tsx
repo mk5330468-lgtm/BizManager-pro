@@ -21,6 +21,7 @@ import {
 import { Customer, Product, Invoice } from '../types';
 import { formatCurrency, cn, formatWhatsAppLink } from '../lib/utils';
 import { useNavigate, Link, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { generateInvoicePDF } from '../lib/pdf';
@@ -39,6 +40,7 @@ interface LineItem {
 }
 
 export default function CreateInvoice() {
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { id } = useParams();
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -150,6 +152,10 @@ export default function CreateInvoice() {
       setCustomerSearch(newCustomer.name);
       setIsQuickAddOpen(false);
       setNewCustomer({ name: '', phone: '' });
+      
+      // Invalidate queries to sync with other pages
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
     } catch (error) {
       console.error('Error adding customer:', error);
     }
@@ -204,6 +210,9 @@ export default function CreateInvoice() {
       setNewProduct({ 
         name: '', category: '', sku: '', purchase_price: 0, selling_price: 0, stock_quantity: 0, low_stock_alert: 5, tax_percentage: 0 
       });
+      // Invalidate queries to sync with other pages
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
     } catch (error) {
       console.error('Error adding product:', error);
       alert('Failed to add product. Please check if SKU is unique.');
@@ -327,7 +336,13 @@ Thank you for your business!`;
 
       setSavedInvoiceData(fullInvoice);
       
-      // Note: Backend handles PDF/PNG generation in the background automatically
+      // Invalidate all related queries to reflect the new invoice/stock/balance everywhere
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
       
       // Navigate to invoices list and open preview in the same tab
       navigate('/invoices', { state: { previewInvoiceId: fullInvoice.id } });

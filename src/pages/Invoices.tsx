@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Search, 
   Plus, 
@@ -25,16 +26,27 @@ import { motion, AnimatePresence } from 'motion/react';
 import ConfirmModal from '../components/ConfirmModal';
 
 export default function Invoices() {
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  const { data: invoices = [], isLoading: loading, refetch: fetchInvoices } = useQuery({
+    queryKey: ['invoices'],
+    queryFn: () => supabaseService.getInvoices(),
+    staleTime: 1000 * 10, // 10 seconds
+  });
+
+  const { data: business, refetch: fetchBusiness } = useQuery({
+    queryKey: ['business'],
+    queryFn: () => supabaseService.getBusiness(),
+    staleTime: 1000 * 6 * 60, // 1 hour
+  });
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'partial' | 'unpaid'>('all');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'preview'>('list');
-  const [business, setBusiness] = useState<any>(null);
   const [previewScale, setPreviewScale] = useState(1);
   const previewContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -69,12 +81,9 @@ export default function Invoices() {
 
   useEffect(() => {
     const init = async () => {
-      const data = await fetchInvoices();
-      await fetchBusiness();
-      
       const state = location.state as { previewInvoiceId?: number };
-      if (state?.previewInvoiceId && data) {
-        const invoice = data.find(i => i.id === state.previewInvoiceId);
+      if (state?.previewInvoiceId && invoices.length > 0) {
+        const invoice = invoices.find(i => i.id === state.previewInvoiceId);
         if (invoice) {
           handleViewInvoice(invoice);
           // Clear state so it doesn't reopen on refresh
@@ -84,37 +93,13 @@ export default function Invoices() {
     };
     init();
 
-    // Listen for global data refresh events
     const handleRefresh = () => {
       fetchInvoices();
       fetchBusiness();
     };
     window.addEventListener('refresh-data', handleRefresh);
     return () => window.removeEventListener('refresh-data', handleRefresh);
-  }, []);
-
-  const fetchBusiness = async () => {
-    try {
-      const data = await supabaseService.getBusiness();
-      setBusiness(data);
-    } catch (error) {
-      console.error('Error fetching business:', error);
-    }
-  };
-
-  const fetchInvoices = async () => {
-    setLoading(true);
-    try {
-      const data = await supabaseService.getInvoices();
-      setInvoices(data);
-      return data;
-    } catch (error) {
-      console.error('Error fetching invoices:', error);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [invoices, fetchBusiness, fetchInvoices, location.pathname, navigate, location.state]);
 
   const handleDelete = (id: number) => {
     setInvoiceToDelete(id);
@@ -128,7 +113,15 @@ export default function Invoices() {
       await supabaseService.deleteInvoice(invoiceToDelete);
       setIsDeleteModalOpen(false);
       setInvoiceToDelete(null);
-      fetchInvoices();
+      
+      // Invalidate all related queries to ensure consistency
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] }); // Stock might have been reverted
+      queryClient.invalidateQueries({ queryKey: ['customers'] }); // Balances might have changed
+      
+      window.dispatchEvent(new CustomEvent('refresh-data'));
     } catch (error) {
       console.error('Error deleting invoice:', error);
     } finally {
@@ -325,26 +318,37 @@ Thank you!`;
             />
           </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
-            {[
-              { id: 'all', label: 'All' },
-              { id: 'paid', label: 'Paid' },
-              { id: 'partial', label: 'Partial' },
-              { id: 'unpaid', label: 'Pending' }
-            ].map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setStatusFilter(f.id as any)}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border whitespace-nowrap",
-                  statusFilter === f.id 
-                    ? "bg-indigo-600 border-indigo-600 text-white shadow-lg" 
-                    : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-indigo-500"
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
+          <div className="flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit overflow-x-auto no-scrollbar scroll-smooth relative">
+            <div className="flex min-w-max">
+              {[
+                { id: 'all', label: 'All Invoices' },
+                { id: 'paid', label: 'Paid' },
+                { id: 'partial', label: 'Partial' },
+                { id: 'unpaid', label: 'Pending' }
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setStatusFilter(f.id as any)}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold transition-all relative z-10 text-[10px] uppercase tracking-wider",
+                    statusFilter === f.id 
+                      ? "text-indigo-600" 
+                      : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                  )}
+                >
+                  {statusFilter === f.id && (
+                    <motion.div 
+                      layoutId="invoiceFilter"
+                      className="absolute inset-0 bg-white dark:bg-slate-900 rounded-lg shadow-sm"
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+                  <span className="relative z-20 whitespace-nowrap">
+                    {f.label}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </motion.div>

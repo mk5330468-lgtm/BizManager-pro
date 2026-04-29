@@ -21,9 +21,11 @@ import {
   Wallet,
   Calendar,
   Save,
-  CheckCircle2
+  CheckCircle2,
+  AlertTriangle
 } from 'lucide-react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate, useNavigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { useTheme } from './context/ThemeContext';
@@ -38,12 +40,15 @@ import ShaderBackground from './components/ShaderBackground';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Customers from './pages/Customers';
+import Suppliers from './pages/Suppliers';
 import Invoices from './pages/Invoices';
 import CreateInvoice from './pages/CreateInvoice';
 import Purchases from './pages/Purchases';
 import Reports from './pages/Reports';
+import People from './pages/People';
 import Payments from './pages/Payments';
 import ProductProfitDetail from './pages/ProductProfitDetail';
+import DailySalesDetail from './pages/DailySalesDetail';
 import Settings from './pages/Settings';
 import Diagnostics from './pages/Diagnostics';
 import PublicInvoice from './pages/PublicInvoice';
@@ -70,7 +75,7 @@ const Sidebar = ({ isOpen, toggle, logout, business }: { isOpen: boolean, toggle
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', to: '/' },
     { icon: Package, label: 'Products', to: '/products' },
-    { icon: Users, label: 'Customers', to: '/customers' },
+    { icon: Users, label: 'Customers & Sellers', to: '/people' },
     { icon: ShoppingCart, label: 'Purchases', to: '/purchases' },
     { icon: FileText, label: 'Invoices', to: '/invoices' },
     { icon: Wallet, label: 'Pay In', to: '/payments' },
@@ -160,6 +165,7 @@ const Sidebar = ({ isOpen, toggle, logout, business }: { isOpen: boolean, toggle
 };
 
 function AppContent() {
+  const queryClient = useQueryClient();
   const { user, loading, logout } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isPayInModalOpen, setIsPayInModalOpen] = useState(false);
@@ -184,6 +190,32 @@ function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const [dbStatus, setDbStatus] = useState<{ status: string, message?: string } | null>(null);
+
+  useEffect(() => {
+    // Check system health on load
+    fetch('/api/health')
+      .then(res => res.json())
+      .then(data => {
+        if (data.status !== 'ok') {
+          setDbStatus({ status: 'error', message: data.message });
+        } else {
+          // Check for missing tables
+          const missing = Object.entries(data.tables || {})
+            .filter(([_, status]) => status === 'missing' || String(status).includes('error'))
+            .map(([name]) => name);
+          
+          if (missing.length > 0) {
+            setDbStatus({ 
+              status: 'warning', 
+              message: `Database issues detected. Missing or inaccessible tables: ${missing.join(', ')}.` 
+            });
+          }
+        }
+      })
+      .catch(err => console.error('Health check failed:', err));
+  }, []);
+
   // Check for public routes first
   const isPublicRoute = location.pathname.startsWith('/public/');
 
@@ -200,7 +232,14 @@ function AppContent() {
       if (user) {
         supabaseService.getCustomers()
           .then(setCustomers)
-          .catch(err => console.error('Failed to fetch customers in App:', err));
+          .catch(err => {
+            console.error('Failed to fetch customers in App:', err);
+            // If we have a common failure, maybe suggest diagnostics
+            if (err.message?.includes('Business ID required')) {
+               console.warn('Retrying customer fetch in 2s due to missing business ID...');
+               setTimeout(fetchCustomers, 2000);
+            }
+          });
       }
     };
 
@@ -210,6 +249,7 @@ function AppContent() {
     const handleRefresh = () => {
       fetchBusiness();
       fetchCustomers();
+      queryClient.invalidateQueries();
     };
 
     window.addEventListener('refresh-data', handleRefresh);
@@ -296,6 +336,9 @@ function AppContent() {
         .then(setCustomers)
         .catch(err => console.error('Failed to refresh customers:', err));
       
+      // Invalidate all related queries to ensure consistency across the app
+      queryClient.invalidateQueries();
+      
       setTimeout(() => {
         setIsPayInModalOpen(false);
         setPaymentSuccess(false);
@@ -316,6 +359,31 @@ function AppContent() {
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950/50 dark:backdrop-blur-[2px] font-sans text-slate-900 dark:text-slate-100 transition-colors duration-300 relative overflow-hidden">
       <ShaderBackground className="hidden dark:block" />
       <Sidebar isOpen={isSidebarOpen} toggle={toggleSidebar} logout={logout} business={business} />
+      
+      {dbStatus && (
+        <div className={`fixed bottom-4 right-4 z-[9999] max-w-sm p-4 rounded-2xl shadow-2xl border flex items-start gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500 ${
+          dbStatus.status === 'error' ? 'bg-rose-50 border-rose-100 text-rose-800' : 'bg-amber-50 border-amber-100 text-amber-800'
+        }`}>
+          <div className={`p-2 rounded-xl ${dbStatus.status === 'error' ? 'bg-rose-100' : 'bg-amber-100'}`}>
+            <AlertTriangle size={20} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-bold text-sm mb-1">{dbStatus.status === 'error' ? 'System Error' : 'Setup Required'}</h4>
+            <p className="text-xs opacity-90 leading-relaxed mb-3 truncate hover:whitespace-normal">{dbStatus.message}</p>
+            <Link 
+              to="/diagnostics" 
+              className={`text-xs font-bold py-1.5 px-3 rounded-lg inline-block transition-colors ${
+                dbStatus.status === 'error' ? 'bg-rose-600 text-white hover:bg-rose-700' : 'bg-amber-600 text-white hover:bg-amber-700'
+              }`}
+            >
+              Go to Diagnostics
+            </Link>
+          </div>
+          <button onClick={() => setDbStatus(null)} className="opacity-50 hover:opacity-100 shrink-0">
+            <X size={16} />
+          </button>
+        </div>
+      )}
       
       <main className={cn(
         "flex-1 flex flex-col min-w-0 transition-all duration-200 ease-out relative z-10",
@@ -364,30 +432,23 @@ function AppContent() {
         {/* Content */}
         <div className="flex-1 p-2.5 lg:p-4 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={location.pathname}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-              >
-                <Routes location={location}>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/products" element={<Products />} />
-                  <Route path="/customers" element={<Customers />} />
-                  <Route path="/purchases" element={<Purchases />} />
-                  <Route path="/invoices" element={<Invoices />} />
-                  <Route path="/invoices/new" element={<CreateInvoice />} />
-                  <Route path="/invoices/edit/:id" element={<CreateInvoice />} />
-                  <Route path="/payments" element={<Payments />} />
-                  <Route path="/reports" element={<Reports />} />
-                  <Route path="/reports/product-profit" element={<ProductProfitDetail />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </motion.div>
-            </AnimatePresence>
+            <Routes location={location}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/products" element={<Products />} />
+              <Route path="/people" element={<People />} />
+              <Route path="/customers" element={<Customers />} />
+              <Route path="/suppliers" element={<Suppliers />} />
+              <Route path="/purchases" element={<Purchases />} />
+              <Route path="/invoices" element={<Invoices />} />
+              <Route path="/invoices/new" element={<CreateInvoice />} />
+              <Route path="/invoices/edit/:id" element={<CreateInvoice />} />
+              <Route path="/payments" element={<Payments />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/reports/product-profit" element={<ProductProfitDetail />} />
+              <Route path="/reports/daily-sales" element={<DailySalesDetail />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
           </div>
         </div>
       </main>
@@ -706,13 +767,26 @@ function AppContent() {
   );
 }
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 10,   // 10 minutes
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
 export default function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <Toaster position="top-right" />
-        <AppContent />
-      </AuthProvider>
-    </Router>
+    <QueryClientProvider client={queryClient}>
+      <Router>
+        <AuthProvider>
+          <Toaster position="top-right" />
+          <AppContent />
+        </AuthProvider>
+      </Router>
+    </QueryClientProvider>
   );
 }

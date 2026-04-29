@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -12,7 +13,8 @@ import {
   CreditCard,
   ChevronRight,
   TrendingDown,
-  ExternalLink
+  ExternalLink,
+  List
 } from 'lucide-react';
 import { formatCurrency, formatDate, cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -34,28 +36,62 @@ import {
 } from 'recharts';
 
 export default function Reports() {
-  const [salesData, setSalesData] = useState<{ current: any[], previous: any[], prevMonthLabel: string }>({ current: [], previous: [], prevMonthLabel: '' });
-  const [yearlyStats, setYearlyStats] = useState<any[]>([]);
-  const [reportStats, setReportStats] = useState({
-    perProductProfit: [] as any[],
-    monthlySaleReport: [] as any[],
-    topCategory: 'N/A'
-  });
-  const [loading, setLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
-  const [monthInvoices, setMonthInvoices] = useState<any[]>([]);
-  const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const queryClient = useQueryClient();
   const [reportMonth, setReportMonth] = useState<string>(new Date().toISOString().slice(0, 7));
-  const [detailedTransactions, setDetailedTransactions] = useState<any[]>([]);
-  const [detailedProfit, setDetailedProfit] = useState<any[]>([]);
-  const [monthlySummary, setMonthlySummary] = useState<any>(null);
-  const [dashboardStats, setDashboardStats] = useState<any>(null);
+
+  const { data: salesData = { current: [], previous: [], prevMonthLabel: '' }, isLoading: salesLoading } = useQuery({
+    queryKey: ['reports', 'sales', reportMonth],
+    queryFn: () => supabaseService.getSalesReport(reportMonth),
+    staleTime: 1000 * 60, // 1 minute
+  });
+
+  const { data: reportStats = { perProductProfit: [], monthlySaleReport: [], topCategory: 'N/A' }, isLoading: statsLoading } = useQuery({
+    queryKey: ['reports', 'stats', reportMonth],
+    queryFn: () => supabaseService.getStatsReport(reportMonth),
+    staleTime: 1000 * 60, // 1 minute
+  });
+
+  const { data: detailedProfit = [], isLoading: profitLoading } = useQuery({
+    queryKey: ['reports', 'profit', reportMonth],
+    queryFn: () => supabaseService.getDetailedProductProfit(reportMonth),
+    staleTime: 1000 * 60, // 1 minute
+  });
+
+  const { data: detailedTransactions = [], isLoading: transactionsLoading } = useQuery({
+    queryKey: ['reports', 'transactions', reportMonth],
+    queryFn: () => supabaseService.getDetailedTransactionsReport(reportMonth),
+    staleTime: 1000 * 60, // 1 minute
+  });
+
+  const { data: dashboardStats, isLoading: dashboardLoading } = useQuery({
+    queryKey: ['dashboardStats'],
+    queryFn: () => supabaseService.getDashboardStats(),
+    staleTime: 1000 * 60, // 1 minute
+  });
+
+  const { data: yearlyStats = [] } = useQuery({
+    queryKey: ['reports', 'yearlyStats'],
+    queryFn: () => supabaseService.getYearlyStats(),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+
+  const { data: querySummary } = useQuery({
+    queryKey: ['reports', 'summary', reportMonth],
+    queryFn: () => supabaseService.getMonthlySummary(reportMonth),
+    staleTime: 1000 * 60, // 1 minute
+  });
+
+  const loading = salesLoading || statsLoading || profitLoading || transactionsLoading || dashboardLoading;
+  
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
   const [manualSummary, setManualSummary] = useState({
     sales_cash: 0, sales_upi: 0,
     goods_cash: 0, goods_upi: 0,
     expenses_cash: 0, expenses_upi: 0
   });
+  const [monthInvoices, setMonthInvoices] = useState<any[]>([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
 
   // Helper to get all days in a month
   const getDaysInMonth = (monthStr: string) => {
@@ -102,40 +138,14 @@ export default function Reports() {
   };
 
   useEffect(() => {
-    const fetchData = () => {
-      if (!salesData) setLoading(true);
-      Promise.all([
-        supabaseService.getSalesReport(reportMonth),
-        supabaseService.getStatsReport(reportMonth),
-        supabaseService.getDetailedTransactionsReport(reportMonth),
-        supabaseService.getDetailedProductProfit(reportMonth),
-        supabaseService.getMonthlySummary(reportMonth),
-        supabaseService.getDashboardStats(),
-        supabaseService.getYearlyStats()
-      ]).then(([sales, stats, detailed, profit, summary, dStats, yStats]) => {
-        setSalesData(sales);
-        setReportStats(stats);
-        setDetailedTransactions(detailed);
-        setDetailedProfit(profit);
-        setMonthlySummary(summary);
-        setDashboardStats(dStats);
-        setYearlyStats(yStats);
-        setLoading(false);
-      }).catch(err => {
-        console.error('Error fetching report data:', err);
-        setLoading(false);
-      });
-    };
-
-    fetchData();
-
     // Listen for global data refresh events
     const handleRefresh = () => {
-      fetchData();
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
     };
     window.addEventListener('refresh-data', handleRefresh);
     return () => window.removeEventListener('refresh-data', handleRefresh);
-  }, [reportMonth]);
+  }, [queryClient]);
 
   const handleMonthClick = async (month: string) => {
     setSelectedMonth(month);
@@ -250,6 +260,13 @@ export default function Reports() {
           <p className="text-xs text-slate-500 dark:text-slate-400">Analyze performance trends.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <Link 
+            to={`/reports/daily-sales?month=${reportMonth}`}
+            className="flex items-center justify-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-xl font-bold transition-all shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 text-sm"
+          >
+            <List size={18} />
+            Ledger
+          </Link>
           <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 shadow-sm">
             <Calendar size={16} className="text-slate-400" />
             <input 
@@ -300,7 +317,7 @@ export default function Reports() {
             <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/50 dark:border-slate-800">
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Collections</span>
               <span className="text-base font-black text-indigo-600">
-                {formatCurrency((monthlySummary?.sales?.cash || 0) + (monthlySummary?.sales?.upi || 0))}
+                {formatCurrency((querySummary?.sales?.cash || 0) + (querySummary?.sales?.upi || 0))}
               </span>
             </div>
 
@@ -316,23 +333,23 @@ export default function Reports() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   <tr>
                     <td className="py-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-300">Sales</td>
-                    <td className="py-1.5 text-[11px] font-black text-slate-900 dark:text-white text-right">{formatCurrency(monthlySummary?.sales?.cash || 0)}</td>
-                    <td className="py-1.5 text-[11px] font-black text-slate-900 dark:text-white text-right">{formatCurrency(monthlySummary?.sales?.upi || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-slate-900 dark:text-white text-right">{formatCurrency(querySummary?.sales?.cash || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-slate-900 dark:text-white text-right">{formatCurrency(querySummary?.sales?.upi || 0)}</td>
                   </tr>
                   <tr>
                     <td className="py-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-300">Goods</td>
-                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(monthlySummary?.goods?.cash || 0)}</td>
-                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(monthlySummary?.goods?.upi || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(querySummary?.goods?.cash || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(querySummary?.goods?.upi || 0)}</td>
                   </tr>
                   <tr>
                     <td className="py-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-300">Costs</td>
-                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(monthlySummary?.expenses?.cash || 0)}</td>
-                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(monthlySummary?.expenses?.upi || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(querySummary?.expenses?.cash || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(querySummary?.expenses?.upi || 0)}</td>
                   </tr>
                   <tr className="bg-indigo-50/50 dark:bg-indigo-900/20">
                     <td className="py-1.5 text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase">Net</td>
-                    <td className="py-1.5 text-[11px] font-black text-indigo-600 dark:text-indigo-400 text-right">{formatCurrency(monthlySummary?.stillHave?.cash || 0)}</td>
-                    <td className="py-1.5 text-[11px] font-black text-indigo-600 dark:text-indigo-400 text-right">{formatCurrency(monthlySummary?.stillHave?.upi || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-indigo-600 dark:text-indigo-400 text-right">{formatCurrency(querySummary?.stillHave?.cash || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-indigo-600 dark:text-indigo-400 text-right">{formatCurrency(querySummary?.stillHave?.upi || 0)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -823,108 +840,30 @@ export default function Reports() {
         )}
       </AnimatePresence>
 
-      {/* Detailed Table */}
+      {/* Call to Action for Detailed Ledger */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
         className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden"
       >
-        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white">Daily Sales Breakdown</h3>
-          <div className="flex gap-4 text-xs">
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span className="text-slate-500">Payments (Pay In)</span>
+        <div className="p-8 flex flex-col sm:flex-row items-center justify-between gap-6 bg-gradient-to-br from-indigo-50/50 to-white dark:from-indigo-900/10 dark:to-slate-900">
+          <div className="flex items-center gap-6">
+            <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-[2rem] shadow-xl shadow-indigo-100 dark:shadow-none flex items-center justify-center text-indigo-600">
+              <FileText size={32} />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white">Daily Sales Ledger</h3>
+              <p className="text-sm text-slate-500 font-medium max-w-xs">View every transaction, customer payments, and invoices in a detailed day-by-day breakdown.</p>
             </div>
           </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/50">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Type</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Customer</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Reference</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Amount</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status/Mode</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              <AnimatePresence>
-                {detailedTransactions.length === 0 ? (
-                  <motion.tr 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">
-                      No transactions found for this month.
-                    </td>
-                  </motion.tr>
-                ) : (
-                  (() => {
-                    const grouped = detailedTransactions.reduce((acc: any, tx: any) => {
-                      const date = formatDate(tx.date);
-                      if (!acc[date]) acc[date] = [];
-                      acc[date].push(tx);
-                      return acc;
-                    }, {});
-
-                    return Object.entries(grouped).map(([date, transactions]: [string, any]) => (
-                      <React.Fragment key={date}>
-                        <motion.tr 
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="bg-slate-50/50 dark:bg-slate-800/30"
-                        >
-                          <td colSpan={5} className="px-6 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-y border-slate-100 dark:border-slate-800">
-                            {date}
-                          </td>
-                        </motion.tr>
-                        {transactions.map((tx: any, i: number) => {
-                          return (
-                            <motion.tr 
-                              key={`${tx.type}-${tx.id}-${i}`}
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.95 }}
-                              className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
-                            >
-                              <td className="px-6 py-4">
-                                <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400">
-                                  {tx.type}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">
-                                {tx.customer_name}
-                              </td>
-                              <td className="px-6 py-4 text-slate-500 dark:text-slate-400 font-mono text-xs">
-                                {tx.reference}
-                              </td>
-                              <td className="px-6 py-4 font-black text-slate-900 dark:text-white">
-                                {formatCurrency(tx.amount)}
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className={cn(
-                                  "text-[10px] font-bold uppercase",
-                                  tx.status === 'paid' || tx.status === 'cash' || tx.status === 'upi'
-                                    ? "text-emerald-600 dark:text-emerald-400"
-                                    : "text-rose-600 dark:text-rose-400"
-                                )}>
-                                  {tx.status}
-                                </span>
-                              </td>
-                            </motion.tr>
-                          );
-                        })}
-                      </React.Fragment>
-                    ));
-                  })()
-                )}
-              </AnimatePresence>
-            </tbody>
-          </table>
+          <Link 
+            to={`/reports/daily-sales?month=${reportMonth}`}
+            className="group flex items-center gap-3 bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-8 py-4 rounded-[2rem] font-black transition-all shadow-2xl hover:scale-105 active:scale-95"
+          >
+            Open Detailed Breakdown
+            <ExternalLink size={20} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+          </Link>
         </div>
       </motion.div>
     </div>

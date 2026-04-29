@@ -95,27 +95,36 @@ const fetchWithBusinessId = async (url: string, options: RequestInit = {}) => {
 
   // Ensure we have a session
   if (!cachedSession || Date.now() - lastSessionFetch > SESSION_CACHE_TTL) {
-    const { data: { session } } = await supabase.auth.getSession();
-    cachedSession = session;
-    lastSessionFetch = Date.now();
+    try {
+      const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr) throw sessionErr;
+      
+      cachedSession = session;
+      cachedBusinessId = session?.user?.id || null;
+      lastSessionFetch = Date.now();
+      
+      console.log('fetchWithBusinessId: Session refreshed:', !!cachedSession, cachedBusinessId);
+    } catch (sessionError) {
+      console.warn('Failed to get session in fetchWithBusinessId:', sessionError);
+    }
   }
 
   const headers = constructHeaders(cachedSession, url, options);
   if (headers === null) {
-    const responseData = { error: 'Business ID required' };
-    const responseString = JSON.stringify(responseData);
+    const errorMsg = 'Business ID required';
+    const hasSession = !!cachedSession;
+    const hasUserId = !!cachedSession?.user?.id;
     
-    return {
-      ok: false,
-      status: 400,
-      statusText: 'Bad Request',
-      headers: new Headers({ 'Content-Type': 'application/json' }),
-      json: async () => responseData,
-      text: async () => responseString,
-      blob: async () => new Blob([responseString], { type: 'application/json' }),
-      arrayBuffer: async () => new TextEncoder().encode(responseString).buffer,
-      clone: function() { return { ...this }; }
-    } as any;
+    console.error(`Fetch error for ${url}: ${errorMsg}. Session: ${hasSession}, UserID: ${hasUserId}`);
+    
+    // Create a mock response object for documentation/consistency, but throw immediately
+    const responseData = { 
+      error: errorMsg, 
+      message: 'You must be logged in to access this data.',
+      debug: { hasSession, hasUserId, url }
+    };
+    
+    throw new Error(errorMsg);
   }
 
   try {
@@ -199,8 +208,7 @@ export const supabaseService = {
   // Products
   async getProducts() {
     const res = await fetchWithBusinessId('/api/products');
-    if (!res.ok) throw new Error('Failed to fetch products');
-    return await safeJson(res) as Product[];
+    return await res.json() as Product[];
   },
 
   async createProduct(product: Omit<Product, 'id'>) {
@@ -232,8 +240,7 @@ export const supabaseService = {
   // Customers
   async getCustomers() {
     const res = await fetchWithBusinessId('/api/customers');
-    if (!res.ok) throw new Error('Failed to fetch customers');
-    return await safeJson(res) as Customer[];
+    return await res.json() as Customer[];
   },
 
   async createCustomer(customer: Omit<Customer, 'id'>) {
@@ -272,6 +279,62 @@ export const supabaseService = {
       body: JSON.stringify(paymentData)
     });
     if (!response.ok) throw new Error('Failed to record payment');
+    return await safeJson(response);
+  },
+
+  // Suppliers (Parties)
+  async getSuppliers() {
+    const res = await fetchWithBusinessId('/api/suppliers');
+    if (!res.ok) throw new Error('Failed to fetch suppliers');
+    return await safeJson(res);
+  },
+
+  async createSupplier(supplier: any) {
+    const res = await fetchWithBusinessId('/api/suppliers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(supplier)
+    });
+    if (!res.ok) throw new Error('Failed to create supplier');
+    return await safeJson(res);
+  },
+
+  async updateSupplier(id: number, updates: any) {
+    const res = await fetchWithBusinessId(`/api/suppliers/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    if (!res.ok) throw new Error('Failed to update supplier');
+    return await safeJson(res);
+  },
+
+  async deleteSupplier(id: number) {
+    const res = await fetchWithBusinessId(`/api/suppliers/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error('Failed to delete supplier');
+  },
+
+  async getSupplierHistory(supplierId: number) {
+    const res = await fetchWithBusinessId(`/api/suppliers/${supplierId}/payments`);
+    if (!res.ok) throw new Error('Failed to fetch supplier history');
+    return await safeJson(res);
+  },
+
+  async getSupplierPurchases(supplierId: number) {
+    const res = await fetchWithBusinessId(`/api/suppliers/${supplierId}/purchases`);
+    if (!res.ok) throw new Error('Failed to fetch supplier purchases');
+    return await safeJson(res);
+  },
+
+  async recordSupplierPayment(paymentData: any) {
+    const response = await fetchWithBusinessId('/api/payments/supplier', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(paymentData)
+    });
+    if (!response.ok) throw new Error('Failed to record supplier payment');
     return await safeJson(response);
   },
 
@@ -574,7 +637,7 @@ export const supabaseService = {
   },
 
   async search(query: string) {
-    if (!query || query.length < 2) return { products: [], customers: [] };
+    if (!query || query.length < 2) return { products: [], customers: [], suppliers: [] };
     const res = await fetchWithBusinessId(`/api/search?q=${encodeURIComponent(query)}`);
     if (!res.ok) throw new Error('Search failed');
     return await safeJson(res);
@@ -585,6 +648,7 @@ export const supabaseService = {
     this.getDashboardStats().catch(() => {});
     this.getProducts().catch(() => {});
     this.getCustomers().catch(() => {});
+    this.getSuppliers().catch(() => {});
     this.getBusiness().catch(() => {});
   }
 };

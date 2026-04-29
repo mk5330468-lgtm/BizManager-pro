@@ -35,6 +35,19 @@ CREATE TABLE IF NOT EXISTS customers (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Suppliers Table (Parties)
+CREATE TABLE IF NOT EXISTS suppliers (
+  id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  phone TEXT,
+  email TEXT,
+  address TEXT,
+  gst_number TEXT,
+  outstanding_balance DECIMAL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Products Table
 CREATE TABLE IF NOT EXISTS products (
   id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
@@ -55,6 +68,7 @@ CREATE TABLE IF NOT EXISTS purchases (
   id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
   business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   purchase_number TEXT NOT NULL,
+  supplier_id BIGINT REFERENCES suppliers(id) ON DELETE SET NULL,
   supplier_name TEXT NOT NULL,
   invoice_number TEXT,
   subtotal DECIMAL DEFAULT 0,
@@ -66,6 +80,8 @@ CREATE TABLE IF NOT EXISTS purchases (
   balance_due DECIMAL DEFAULT 0,
   payment_status TEXT CHECK(payment_status IN ('paid', 'unpaid', 'partial')) DEFAULT 'unpaid',
   payment_mode TEXT CHECK(payment_mode IN ('cash', 'upi', 'both')),
+  cash_amount DECIMAL DEFAULT 0,
+  upi_amount DECIMAL DEFAULT 0,
   purchase_date TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(business_id, purchase_number)
 );
@@ -126,6 +142,21 @@ CREATE TABLE IF NOT EXISTS payments (
   payment_date TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Supplier Payments (Pay Out)
+CREATE TABLE IF NOT EXISTS supplier_payments (
+  id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  business_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  purchase_id BIGINT REFERENCES purchases(id) ON DELETE SET NULL,
+  supplier_id BIGINT REFERENCES suppliers(id) ON DELETE CASCADE,
+  amount DECIMAL NOT NULL,
+  payment_mode TEXT CHECK(payment_mode IN ('cash', 'upi', 'both')),
+  cash_amount DECIMAL DEFAULT 0,
+  upi_amount DECIMAL DEFAULT 0,
+  transaction_reference TEXT,
+  notes TEXT,
+  payment_date TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Expenses Table
 CREATE TABLE IF NOT EXISTS expenses (
   id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
@@ -134,6 +165,8 @@ CREATE TABLE IF NOT EXISTS expenses (
   description TEXT,
   amount DECIMAL NOT NULL,
   payment_mode TEXT CHECK(payment_mode IN ('cash', 'upi', 'both')),
+  cash_amount DECIMAL DEFAULT 0,
+  upi_amount DECIMAL DEFAULT 0,
   expense_date TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -158,6 +191,8 @@ ALTER TABLE invoice_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE suppliers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE supplier_payments ENABLE ROW LEVEL SECURITY;
 
 -- Storage Buckets and Policies
 -- These usually need to be run as superuser or via the dashboard, 
@@ -351,3 +386,35 @@ CREATE POLICY "Users can update own accounts" ON accounts FOR UPDATE TO authenti
 
 DROP POLICY IF EXISTS "Users can delete own accounts" ON accounts;
 CREATE POLICY "Users can delete own accounts" ON accounts FOR DELETE TO authenticated USING (auth.uid() = business_id);
+
+-- Suppliers
+DROP POLICY IF EXISTS "Service Role Suppliers Access" ON suppliers;
+CREATE POLICY "Service Role Suppliers Access" ON suppliers FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Users can view own suppliers" ON suppliers;
+CREATE POLICY "Users can view own suppliers" ON suppliers FOR SELECT TO authenticated USING (auth.uid() = business_id);
+
+DROP POLICY IF EXISTS "Users can insert own suppliers" ON suppliers;
+CREATE POLICY "Users can insert own suppliers" ON suppliers FOR INSERT TO authenticated WITH CHECK (auth.uid() = business_id);
+
+DROP POLICY IF EXISTS "Users can update own suppliers" ON suppliers;
+CREATE POLICY "Users can update own suppliers" ON suppliers FOR UPDATE TO authenticated USING (auth.uid() = business_id);
+
+DROP POLICY IF EXISTS "Users can delete own suppliers" ON suppliers;
+CREATE POLICY "Users can delete own suppliers" ON suppliers FOR DELETE TO authenticated USING (auth.uid() = business_id);
+
+-- Supplier Payments
+DROP POLICY IF EXISTS "Service Role Supplier Payments Access" ON supplier_payments;
+CREATE POLICY "Service Role Supplier Payments Access" ON supplier_payments FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Users can view own supplier payments" ON supplier_payments;
+CREATE POLICY "Users can view own supplier payments" ON supplier_payments FOR SELECT TO authenticated USING (auth.uid() = business_id);
+
+DROP POLICY IF EXISTS "Users can insert own supplier payments" ON supplier_payments;
+CREATE POLICY "Users can insert own supplier payments" ON supplier_payments FOR INSERT TO authenticated WITH CHECK (auth.uid() = business_id);
+
+DROP POLICY IF EXISTS "Users can update own supplier payments" ON supplier_payments;
+CREATE POLICY "Users can update own supplier payments" ON supplier_payments FOR UPDATE TO authenticated USING (auth.uid() = business_id);
+
+DROP POLICY IF EXISTS "Users can delete own supplier payments" ON supplier_payments;
+CREATE POLICY "Users can delete own supplier payments" ON supplier_payments FOR DELETE TO authenticated USING (auth.uid() = business_id);

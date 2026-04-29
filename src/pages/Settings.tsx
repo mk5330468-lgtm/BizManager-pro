@@ -22,6 +22,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { supabaseService } from '../services/supabaseService';
@@ -33,6 +34,7 @@ import { toast } from 'react-hot-toast';
 type Tab = 'profile' | 'invoice' | 'subscription' | 'backup';
 
 export default function Settings() {
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<Tab>((searchParams.get('tab') as Tab) || 'profile');
@@ -201,6 +203,10 @@ export default function Settings() {
     try {
       await supabaseService.updateBusiness(business);
       setSuccess(true);
+      
+      // Invalidate business query to refresh global UI
+      queryClient.invalidateQueries({ queryKey: ['business'] });
+      
       // Dispatch event to refresh sidebar and other components
       window.dispatchEvent(new CustomEvent('refresh-data'));
       setTimeout(() => setSuccess(false), 3000);

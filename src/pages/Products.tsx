@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Search, 
   Plus, 
@@ -16,8 +17,14 @@ import { X } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 
 export default function Products() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  
+  const { data: products = [], isLoading: loading, refetch: fetchProducts } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => supabaseService.getProducts(),
+    staleTime: 1000 * 60 * 5,
+  });
+
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -41,27 +48,13 @@ export default function Products() {
   });
 
   useEffect(() => {
-    fetchProducts();
-
     // Listen for global data refresh events
     const handleRefresh = () => {
       fetchProducts();
     };
     window.addEventListener('refresh-data', handleRefresh);
     return () => window.removeEventListener('refresh-data', handleRefresh);
-  }, []);
-
-  const fetchProducts = async () => {
-    if (products.length === 0) setLoading(true);
-    try {
-      const data = await supabaseService.getProducts();
-      setProducts(data);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [fetchProducts]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +70,14 @@ export default function Products() {
       setFormData({
         name: '', category: '', sku: '', purchase_price: 0, selling_price: 0, stock_quantity: 0, low_stock_alert: 5, tax_percentage: 0
       });
-      fetchProducts();
+      // Invalidate all related queries to ensure consistency across the app
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] }); // In case stock affects line items or invoices
+      
+      // Also trigger a global event for any components not using React Query hooks
+      window.dispatchEvent(new CustomEvent('refresh-data'));
     } catch (error) {
       console.error('Error saving product:', error);
     }
@@ -110,7 +110,13 @@ export default function Products() {
       await supabaseService.deleteProduct(productToDelete);
       setIsDeleteModalOpen(false);
       setProductToDelete(null);
-      fetchProducts();
+      
+      // Invalidate all related queries
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+      
+      window.dispatchEvent(new CustomEvent('refresh-data'));
     } catch (error) {
       console.error('Error deleting product:', error);
     } finally {
@@ -281,27 +287,34 @@ export default function Products() {
       {/* Modal */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 md:p-10">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsModalOpen(false)}
-              className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md"
             />
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.9, y: 40 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+              exit={{ opacity: 0, scale: 0.9, y: 40 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[2rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] overflow-hidden max-h-[90vh] flex flex-col border border-slate-200/50 dark:border-slate-800/50"
             >
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white">{editingProduct ? 'Edit Product' : 'Add New Product'}</h3>
-                <button onClick={() => setIsModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
-                  <X size={20} />
+              <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl">
+                <div>
+                  <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{editingProduct ? 'Edit Product' : 'Add New Product'}</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{editingProduct ? 'Update product details and stock.' : 'Fill in the information below to add a new item.'}</p>
+                </div>
+                <button 
+                  onClick={() => setIsModalOpen(false)} 
+                  className="p-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                >
+                  <X size={24} />
                 </button>
               </div>
-              <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto">
+              <form onSubmit={handleSubmit} className="p-8 space-y-8 overflow-y-auto custom-scrollbar">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Product Name *</label>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { 
   ArrowLeft, 
   Calendar, 
@@ -27,32 +28,21 @@ interface DetailedProfit {
 export default function ProductProfitDetail() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<DetailedProfit[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'product' | 'day'>('product');
   const month = searchParams.get('month') || new Date().toISOString().slice(0, 7);
+
+  const { data: rawData = [], isLoading: loading } = useQuery({
+    queryKey: ['reports', 'profit', month],
+    queryFn: () => supabaseService.getDetailedProductProfit(month),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const data = Array.isArray(rawData) ? rawData : [];
 
   const handleMonthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchParams({ month: e.target.value });
   };
-
-  useEffect(() => {
-    setLoading(true);
-    supabaseService.getDetailedProductProfit(month)
-      .then(data => {
-        if (Array.isArray(data)) {
-          setData(data);
-        } else {
-          console.error("Unexpected data format:", data);
-          setData([]);
-        }
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setLoading(false);
-      });
-  }, [month]);
 
   const filteredData = data.filter(item => 
     (item.product_name || '').toLowerCase().includes((searchTerm || '').toLowerCase())
@@ -144,7 +134,7 @@ export default function ProductProfitDetail() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Profit (Filtered)</p>
           <h4 className="text-2xl font-black text-emerald-600">{formatCurrency(totalProfit)}</h4>
@@ -155,12 +145,36 @@ export default function ProductProfitDetail() {
             {filteredData.reduce((acc, item) => acc + item.quantity, 0)}
           </h4>
         </div>
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="relative">
+        <div className="bg-white dark:bg-slate-900 p-2 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-1">
+          <button
+            onClick={() => setViewMode('product')}
+            className={cn(
+              "flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-tighter transition-all",
+              viewMode === 'product' 
+                ? "bg-indigo-600 text-white shadow-lg" 
+                : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+            )}
+          >
+            Per Product
+          </button>
+          <button
+            onClick={() => setViewMode('day')}
+            className={cn(
+              "flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-tighter transition-all",
+              viewMode === 'day' 
+                ? "bg-indigo-600 text-white shadow-lg" 
+                : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+            )}
+          >
+            Per Day
+          </button>
+        </div>
+        <div className="bg-white dark:bg-slate-900 p-2 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input 
               type="text" 
-              placeholder="Search product..."
+              placeholder={viewMode === 'product' ? "Search product..." : "Search Date..."}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border-none rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -171,66 +185,161 @@ export default function ProductProfitDetail() {
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/50">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Date</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Product</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">Qty</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Price (After Disc)</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Purchase Price</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Profit (Unit)</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Profit</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-400 italic">
-                    Loading detailed profit report...
-                  </td>
+          {viewMode === 'product' ? (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-800/50">
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Product</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">Qty</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Price (After Disc)</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Purchase Price</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Profit (Unit)</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Profit</th>
                 </tr>
-              ) : filteredData.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-400 italic">
-                    No data found for this period.
-                  </td>
-                </tr>
-              ) : (
-                filteredData.map((item, i) => (
-                  <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                    <td className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap text-xs">
-                      {formatDate(item.date)}
-                    </td>
-                    <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">
-                      {item.product_name}
-                    </td>
-                    <td className="px-6 py-4 text-center font-bold text-slate-600 dark:text-slate-400">
-                      {item.quantity}
-                    </td>
-                    <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">
-                      {formatCurrency(item.selling_price_after_discount)}
-                    </td>
-                    <td className="px-6 py-4 font-bold text-slate-500 dark:text-slate-400">
-                      {formatCurrency(item.purchase_price)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className={cn(
-                        "flex items-center gap-1 font-bold",
-                        item.profit_per_unit >= 0 ? "text-emerald-600" : "text-rose-600"
-                      )}>
-                        {item.profit_per_unit >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                        {formatCurrency(item.profit_per_unit)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 font-black text-slate-900 dark:text-white">
-                      {formatCurrency(item.total_profit)}
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400 italic">
+                      Loading detailed profit report...
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : filteredData.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400 italic">
+                      No data found for this period.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredData.map((item, i) => (
+                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                      <td className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap text-xs">
+                        {formatDate(item.date)}
+                      </td>
+                      <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">
+                        {item.product_name}
+                      </td>
+                      <td className="px-6 py-4 text-center font-bold text-slate-600 dark:text-slate-400">
+                        {item.quantity}
+                      </td>
+                      <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">
+                        {formatCurrency(item.selling_price_after_discount)}
+                      </td>
+                      <td className="px-6 py-4 font-bold text-slate-500 dark:text-slate-400">
+                        {formatCurrency(item.purchase_price)}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className={cn(
+                          "flex items-center gap-1 font-bold",
+                          item.profit_per_unit >= 0 ? "text-emerald-600" : "text-rose-600"
+                        )}>
+                          {item.profit_per_unit >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                          {formatCurrency(item.profit_per_unit)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 font-black text-slate-900 dark:text-white">
+                        {formatCurrency(item.total_profit)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          ) : (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-800/50">
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Items Type Sold</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">Total Quantity</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Sales (Cost Basis)</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Daily Profit</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">
+                      Calculating daily profit...
+                    </td>
+                  </tr>
+                ) : (() => {
+                  const dayWise = data.reduce((acc: any, item) => {
+                    const d = formatDate(item.date);
+                    if (!acc[d]) {
+                      acc[d] = {
+                        date: item.date,
+                        dateLabel: d,
+                        products: new Set(),
+                        totalQty: 0,
+                        totalSell: 0,
+                        totalProfit: 0
+                      };
+                    }
+                    acc[d].products.add(item.product_name);
+                    acc[d].totalQty += item.quantity;
+                    acc[d].totalSell += item.selling_price_after_discount * item.quantity;
+                    acc[d].totalProfit += item.total_profit;
+                    return acc;
+                  }, {});
+
+                  const dayList = Object.values(dayWise)
+                    .sort((a: any, b: any) => b.date.localeCompare(a.date))
+                    .filter((day: any) => 
+                      searchTerm === '' || day.dateLabel.toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+
+                  if (dayList.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">
+                          No daily summary found.
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return dayList.map((day: any, i) => (
+                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                      <td className="px-6 py-4 font-black text-slate-900 dark:text-white">
+                        {day.dateLabel}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap gap-1">
+                          {Array.from(day.products).slice(0, 3).map((p: any, j) => (
+                            <span key={j} className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-500 rounded">
+                              {p}
+                            </span>
+                          ))}
+                          {day.products.size > 3 && (
+                            <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/20 text-[10px] font-bold text-indigo-600 rounded">
+                              +{day.products.size - 3} more
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center font-bold text-slate-600 dark:text-slate-400">
+                        {day.totalQty}
+                      </td>
+                      <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">
+                        {formatCurrency(day.totalSell)}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className={cn(
+                          "flex items-center gap-1 font-black text-lg",
+                          day.totalProfit >= 0 ? "text-emerald-600" : "text-rose-600"
+                        )}>
+                          {day.totalProfit >= 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
+                          {formatCurrency(day.totalProfit)}
+                        </div>
+                      </td>
+                    </tr>
+                  ));
+                })()}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>

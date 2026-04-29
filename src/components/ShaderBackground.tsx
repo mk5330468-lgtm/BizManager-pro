@@ -138,9 +138,15 @@ const ShaderBackground: React.FC<ShaderBackgroundProps> = ({ className }) => {
     const resize = () => {
       const displayWidth = canvas.clientWidth;
       const displayHeight = canvas.clientHeight;
-      if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
-        canvas.width = displayWidth;
-        canvas.height = displayHeight;
+      
+      // Cap pixel ratio for performance - 1.5 is enough for retina-like smoothness without the GPU load of 3x or 4x
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      const width = Math.floor(displayWidth * dpr);
+      const height = Math.floor(displayHeight * dpr);
+
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
         gl.viewport(0, 0, canvas.width, canvas.height);
       }
     };

@@ -430,7 +430,7 @@ function AppContent() {
         </header>
 
         {/* Content */}
-        <div className="flex-1 p-2.5 lg:p-4 overflow-y-auto">
+        <div className="flex-1 p-2.5 lg:p-4 overflow-y-auto custom-scrollbar">
           <div className="max-w-7xl mx-auto">
             <Routes location={location}>
               <Route path="/" element={<Dashboard />} />

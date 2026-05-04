@@ -425,7 +425,7 @@ Thank you for your business!`;
                       initial={{ opacity: 0, y: -10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                      className="absolute left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto p-2"
+                      className="absolute left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto custom-scrollbar p-2"
                     >
                       {filteredCustomers.length > 0 ? (
                         filteredCustomers.map(c => (
@@ -524,7 +524,7 @@ Thank you for your business!`;
                   <div className="p-6 border-b border-slate-100 dark:border-slate-800 shrink-0">
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white">Quick Add Customer</h3>
                   </div>
-                  <form onSubmit={handleQuickAddCustomer} className="p-6 space-y-4 overflow-y-auto">
+                  <form onSubmit={handleQuickAddCustomer} className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Name *</label>
                       <input 
@@ -591,7 +591,7 @@ Thank you for your business!`;
                       <X size={24} className="text-slate-400" />
                     </button>
                   </div>
-                  <form onSubmit={handleQuickAddProduct} className="p-8 space-y-8 bg-slate-50/50 dark:bg-slate-900/50 overflow-y-auto">
+                  <form onSubmit={handleQuickAddProduct} className="p-8 space-y-8 bg-slate-50/50 dark:bg-slate-900/50 overflow-y-auto custom-scrollbar">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Product Name *</label>
@@ -721,7 +721,7 @@ Thank you for your business!`;
                     initial={{ opacity: 0, y: -10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    className="absolute left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 max-h-72 overflow-y-auto p-2"
+                    className="absolute left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-2"
                   >
                     {filteredProducts.length > 0 ? (
                       filteredProducts.map(p => (
@@ -758,7 +758,7 @@ Thank you for your business!`;
             </div>
 
             {/* Line Items Table */}
-            <div className="overflow-x-auto no-scrollbar">
+            <div className="overflow-x-auto custom-scrollbar pb-2">
               <table className="w-full text-left border-collapse min-w-[500px]">
                 <thead>
                   <tr className="border-b border-slate-100 dark:border-slate-800">
@@ -805,7 +805,13 @@ Thank you for your business!`;
                           >
                             -
                           </button>
-                          <span className="w-5 text-center font-black text-slate-900 dark:text-white text-[13px]">{item.quantity}</span>
+                          <input 
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => updateQuantity(index, Math.max(1, parseInt(e.target.value) || 1))}
+                            className="w-12 h-7 text-center font-black text-slate-900 dark:text-white text-[13px] bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-all"
+                          />
                           <button 
                             onClick={() => updateQuantity(index, item.quantity + 1)} 
                             className="w-6 h-6 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white text-[11px] font-bold dark:text-white"

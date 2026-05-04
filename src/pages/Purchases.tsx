@@ -56,6 +56,8 @@ export default function Purchases() {
   const [productLoading, setProductLoading] = useState(false);
   const [editingPurchaseId, setEditingPurchaseId] = useState<number | null>(null);
   const [productSearchTerm, setProductSearchTerm] = useState('');
+  const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
+  const [showSupplierResults, setShowSupplierResults] = useState(false);
   const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
   const [newProductData, setNewProductData] = useState({
     name: '',
@@ -232,6 +234,8 @@ export default function Purchases() {
       }
       setIsModalOpen(false);
       setEditingPurchaseId(null);
+      setSupplierSearchTerm('');
+      setShowSupplierResults(false);
       setFormData({
         supplier_name: '',
         supplier_id: null,
@@ -378,6 +382,8 @@ export default function Purchases() {
     try {
       const items = await supabaseService.getPurchaseItems(purchase.id);
       setEditingPurchaseId(purchase.id);
+      setSupplierSearchTerm(purchase.supplier_name);
+      setShowSupplierResults(false);
       setFormData({
         supplier_name: purchase.supplier_name,
         supplier_id: purchase.supplier_id || null,
@@ -428,6 +434,8 @@ export default function Purchases() {
           onClick={() => {
             if (activeTab === 'records') {
               setEditingPurchaseId(null);
+              setSupplierSearchTerm('');
+              setShowSupplierResults(false);
               setFormData({
                 supplier_name: '',
                 supplier_id: null,
@@ -458,7 +466,7 @@ export default function Purchases() {
       </div>
 
       {/* Tabs */}
-      <div className="flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit overflow-x-auto no-scrollbar scroll-smooth relative">
+      <div className="flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit overflow-x-auto custom-scrollbar scroll-smooth relative">
         <div className="flex min-w-max">
           <button 
             onClick={() => setActiveTab('records')}
@@ -507,7 +515,7 @@ export default function Purchases() {
 
       {/* Filter Bar */}
       {activeTab === 'records' && (
-        <div className="flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit overflow-x-auto no-scrollbar scroll-smooth relative">
+        <div className="flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit overflow-x-auto custom-scrollbar scroll-smooth relative">
           <div className="flex min-w-max">
             {[
               { id: 'all', label: 'All Purchases' },
@@ -550,7 +558,7 @@ export default function Purchases() {
             exit={{ opacity: 0, y: -10 }}
             className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden"
           >
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto custom-scrollbar pb-2">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-800/50 border-bottom border-slate-200 dark:border-slate-800">
@@ -769,27 +777,84 @@ export default function Purchases() {
                   <div className="lg:col-span-2 space-y-8">
                     {/* Supplier & Date Section */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 text-[9px]">Supplier / Party Name *</label>
-                        <select 
-                          required
-                          className="w-full px-4 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 dark:text-white font-bold transition-all text-sm"
-                          value={formData.supplier_id || ''}
-                          onChange={(e) => {
-                            const id = e.target.value === '' ? null : Number(e.target.value);
-                            const supplier = suppliers.find(s => s.id === id);
-                            setFormData({
-                              ...formData, 
-                              supplier_id: id,
-                              supplier_name: supplier ? supplier.name : ''
-                            });
-                          }}
-                        >
-                          <option value="">Select Supplier</option>
-                          {suppliers.map(s => (
-                            <option key={s.id} value={s.id}>{s.name} (₹{s.outstanding_balance})</option>
-                          ))}
-                        </select>
+                      <div className="space-y-2 relative">
+                        <div className="flex items-center justify-between mb-1 px-1">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-[9px]">Supplier / Party Name *</label>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              // Reset supplier selection
+                              setFormData(prev => ({ ...prev, supplier_id: null, supplier_name: '' }));
+                              setSupplierSearchTerm('');
+                            }}
+                            className="text-[9px] font-black text-rose-500 uppercase tracking-tighter hover:underline"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                        <div className="relative group">
+                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={18} />
+                          <input 
+                            type="text" 
+                            placeholder="Type supplier name..." 
+                            required
+                            className="w-full pl-11 pr-4 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 dark:text-white font-bold transition-all text-sm"
+                            value={supplierSearchTerm}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setSupplierSearchTerm(value);
+                              setFormData(prev => ({ ...prev, supplier_name: value }));
+                              setShowSupplierResults(true);
+                            }}
+                            onFocus={() => setShowSupplierResults(true)}
+                          />
+                        </div>
+
+                        <AnimatePresence>
+                          {showSupplierResults && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                              className="absolute left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-[120] max-h-64 overflow-y-auto custom-scrollbar p-2"
+                            >
+                              {suppliers.filter(s => (s.name || '').toLowerCase().includes(supplierSearchTerm.toLowerCase())).length > 0 ? (
+                                suppliers
+                                  .filter(s => (s.name || '').toLowerCase().includes(supplierSearchTerm.toLowerCase()))
+                                  .map(s => (
+                                    <button 
+                                      key={s.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setFormData(prev => ({ ...prev, supplier_id: s.id, supplier_name: s.name }));
+                                        setSupplierSearchTerm(s.name);
+                                        setShowSupplierResults(false);
+                                      }}
+                                      className="w-full text-left px-4 py-3 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-xl transition-colors flex items-center justify-between group"
+                                    >
+                                      <div>
+                                        <p className="font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{s.name}</p>
+                                        <p className="text-[10px] font-bold text-emerald-600">Balance: ₹{s.outstanding_balance}</p>
+                                      </div>
+                                      <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-400" />
+                                    </button>
+                                  ))
+                              ) : (
+                                <div className="p-4 text-center">
+                                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">New Supplier</p>
+                                  <p className="text-sm font-black text-slate-900 dark:text-white">"{supplierSearchTerm}"</p>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowSupplierResults(false)}
+                                    className="mt-3 text-xs font-black text-indigo-600 uppercase tracking-widest hover:underline"
+                                  >
+                                    Use this name
+                                  </button>
+                                </div>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                       <div className="space-y-2">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 text-[9px]">Purchase Date</label>
@@ -845,7 +910,7 @@ export default function Purchases() {
                                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-[120] max-h-64 overflow-y-auto p-2"
+                                className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-[120] max-h-64 overflow-y-auto custom-scrollbar p-2"
                               >
                                 {products.filter(p => (p.name || '').toLowerCase().includes(productSearchTerm.toLowerCase())).length > 0 ? (
                                   products
@@ -911,7 +976,7 @@ export default function Purchases() {
                             <h5 className="text-slate-400 font-bold text-sm uppercase tracking-widest">No Items Added</h5>
                           </div>
                         ) : (
-                          <div className="overflow-x-auto no-scrollbar">
+                          <div className="overflow-x-auto custom-scrollbar pb-2">
                             <table className="w-full text-left border-collapse">
                               <thead>
                                 <tr className="border-b border-slate-50 dark:border-slate-700/50">
@@ -942,7 +1007,19 @@ export default function Purchases() {
                                         >
                                           -
                                         </button>
-                                        <span className="font-black text-slate-900 dark:text-white min-w-[20px] text-center text-xs">{item.quantity}</span>
+                                        <input 
+                                          type="number"
+                                          min="1"
+                                          value={item.quantity}
+                                          onChange={(e) => {
+                                            const newQty = Math.max(1, parseInt(e.target.value) || 1);
+                                            const newItems = formData.items.map((i, idx) => 
+                                              idx === index ? { ...i, quantity: newQty, total: newQty * i.price } : i
+                                            );
+                                            setFormData({...formData, items: newItems});
+                                          }}
+                                          className="w-12 h-7 text-center font-black text-slate-900 dark:text-white text-xs bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-all"
+                                        />
                                         <button 
                                           type="button"
                                           onClick={() => {
@@ -1210,7 +1287,7 @@ export default function Purchases() {
                   <X size={20} />
                 </button>
               </div>
-              <form onSubmit={handleExpenseSubmit} className="p-6 space-y-4 overflow-y-auto">
+              <form onSubmit={handleExpenseSubmit} className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Category *</label>
                   <select 
@@ -1415,7 +1492,7 @@ export default function Purchases() {
                   <X size={20} />
                 </button>
               </div>
-              <form onSubmit={handleNewProductSubmit} className="p-6 space-y-4 overflow-y-auto">
+              <form onSubmit={handleNewProductSubmit} className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Product Name *</label>
                   <input 

@@ -318,7 +318,7 @@ Thank you!`;
             />
           </div>
 
-          <div className="flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit overflow-x-auto no-scrollbar scroll-smooth relative">
+          <div className="flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit overflow-x-auto custom-scrollbar scroll-smooth relative">
             <div className="flex min-w-max">
               {[
                 { id: 'all', label: 'All Invoices' },

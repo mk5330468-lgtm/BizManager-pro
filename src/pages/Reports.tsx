@@ -92,6 +92,13 @@ export default function Reports() {
   });
   const [monthInvoices, setMonthInvoices] = useState<any[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [monthlySummary, setMonthlySummary] = useState<any>(null);
+
+  useEffect(() => {
+    if (querySummary) {
+      setMonthlySummary(querySummary);
+    }
+  }, [querySummary]);
 
   // Helper to get all days in a month
   const getDaysInMonth = (monthStr: string) => {
@@ -317,11 +324,11 @@ export default function Reports() {
             <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/50 dark:border-slate-800">
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Collections</span>
               <span className="text-base font-black text-indigo-600">
-                {formatCurrency((querySummary?.sales?.cash || 0) + (querySummary?.sales?.upi || 0))}
+                {formatCurrency((monthlySummary?.sales?.cash || 0) + (monthlySummary?.sales?.upi || 0))}
               </span>
             </div>
 
-            <div className="overflow-x-auto no-scrollbar">
+            <div className="overflow-x-auto custom-scrollbar pb-2">
               <table className="w-full text-left border-collapse min-w-[240px]">
                 <thead>
                   <tr>
@@ -333,23 +340,23 @@ export default function Reports() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   <tr>
                     <td className="py-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-300">Sales</td>
-                    <td className="py-1.5 text-[11px] font-black text-slate-900 dark:text-white text-right">{formatCurrency(querySummary?.sales?.cash || 0)}</td>
-                    <td className="py-1.5 text-[11px] font-black text-slate-900 dark:text-white text-right">{formatCurrency(querySummary?.sales?.upi || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-slate-900 dark:text-white text-right">{formatCurrency(monthlySummary?.sales?.cash || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-slate-900 dark:text-white text-right">{formatCurrency(monthlySummary?.sales?.upi || 0)}</td>
                   </tr>
                   <tr>
                     <td className="py-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-300">Goods</td>
-                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(querySummary?.goods?.cash || 0)}</td>
-                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(querySummary?.goods?.upi || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(monthlySummary?.goods?.cash || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(monthlySummary?.goods?.upi || 0)}</td>
                   </tr>
                   <tr>
                     <td className="py-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-300">Costs</td>
-                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(querySummary?.expenses?.cash || 0)}</td>
-                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(querySummary?.expenses?.upi || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(monthlySummary?.expenses?.cash || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-rose-600 text-right">-{formatCurrency(monthlySummary?.expenses?.upi || 0)}</td>
                   </tr>
                   <tr className="bg-indigo-50/50 dark:bg-indigo-900/20">
                     <td className="py-1.5 text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase">Net</td>
-                    <td className="py-1.5 text-[11px] font-black text-indigo-600 dark:text-indigo-400 text-right">{formatCurrency(querySummary?.stillHave?.cash || 0)}</td>
-                    <td className="py-1.5 text-[11px] font-black text-indigo-600 dark:text-indigo-400 text-right">{formatCurrency(querySummary?.stillHave?.upi || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-indigo-600 dark:text-indigo-400 text-right">{formatCurrency(monthlySummary?.stillHave?.cash || 0)}</td>
+                    <td className="py-1.5 text-[11px] font-black text-indigo-600 dark:text-indigo-400 text-right">{formatCurrency(monthlySummary?.stillHave?.upi || 0)}</td>
                   </tr>
                 </tbody>
               </table>

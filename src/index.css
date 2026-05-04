@@ -16,3 +16,40 @@
     color-scheme: dark;
   }
 }
+
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 10px;
+  }
+  .dark .custom-scrollbar::-webkit-scrollbar-track {
+    background: #1e293b;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+    border: 2px solid #f1f5f9;
+  }
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #475569;
+    border: 2px solid #1e293b;
+  }
+  .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+  }
+  .dark .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+    background: #64748b;
+  }
+  .custom-scrollbar {
+    scrollbar-width: auto;
+    scrollbar-color: #cbd5e1 transparent;
+    scroll-behavior: smooth;
+  }
+  .dark .custom-scrollbar {
+    scrollbar-color: #475569 transparent;
+  }
+}

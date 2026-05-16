@@ -86,8 +86,10 @@ if (!process.env.SUPABASE_URL && fs.existsSync(envPath)) {
   }
 }
 
-const _filename = typeof import.meta !== 'undefined' && import.meta.url ? fileURLToPath(import.meta.url) : '';
-const _dirname = _filename ? path.dirname(_filename) : (typeof __dirname !== 'undefined' ? __dirname : process.cwd());
+// Fix for import.meta.url not being available in CJS bundles efficiently
+const _dirname = typeof __dirname !== 'undefined' 
+  ? __dirname 
+  : path.join(process.cwd(), 'api');
 
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';

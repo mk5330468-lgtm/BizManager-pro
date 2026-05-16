@@ -96,6 +96,7 @@ const fetchWithBusinessId = async (url: string, options: RequestInit = {}) => {
   // Ensure we have a session
   if (!cachedSession || Date.now() - lastSessionFetch > SESSION_CACHE_TTL) {
     try {
+      console.log('fetchWithBusinessId: No cached session or expired, fetching fresh session...');
       const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
       if (sessionErr) throw sessionErr;
       
@@ -109,21 +110,32 @@ const fetchWithBusinessId = async (url: string, options: RequestInit = {}) => {
     }
   }
 
+  // If we still don't have a session, try one last time with a small delay for race conditions
+  if (!cachedSession) {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      cachedSession = session;
+      cachedBusinessId = session.user.id;
+      lastSessionFetch = Date.now();
+      console.log('fetchWithBusinessId: Session recovered after delay:', cachedBusinessId);
+    }
+  }
+
   const headers = constructHeaders(cachedSession, url, options);
   if (headers === null) {
     const errorMsg = 'Business ID required';
     const hasSession = !!cachedSession;
     const hasUserId = !!cachedSession?.user?.id;
     
-    console.error(`Fetch error for ${url}: ${errorMsg}. Session: ${hasSession}, UserID: ${hasUserId}`);
+    // Check if we are still on the login page or a public page where this might be expected
+    const isPublic = url.startsWith('/api/public/') || url === '/api/health';
+    if (!isPublic) {
+      console.error(`Fetch error for ${url}: ${errorMsg}. Session: ${hasSession}, UserID: ${hasUserId}. Redirecting to login if needed.`);
+    }
     
-    // Create a mock response object for documentation/consistency, but throw immediately
-    const responseData = { 
-      error: errorMsg, 
-      message: 'You must be logged in to access this data.',
-      debug: { hasSession, hasUserId, url }
-    };
-    
+    // Instead of just throwing, we can return a promise that will eventually fail, 
+    // but we should check if the user is actually logged in according to Supabase
     throw new Error(errorMsg);
   }
 
@@ -325,6 +337,12 @@ export const supabaseService = {
   async getSupplierPurchases(supplierId: number) {
     const res = await fetchWithBusinessId(`/api/suppliers/${supplierId}/purchases`);
     if (!res.ok) throw new Error('Failed to fetch supplier purchases');
+    return await safeJson(res);
+  },
+
+  async getSupplierPayments() {
+    const res = await fetchWithBusinessId('/api/suppliers/payments');
+    if (!res.ok) throw new Error('Failed to fetch supplier payments');
     return await safeJson(res);
   },
 

@@ -109,11 +109,21 @@ export const getPurchaseHTML = (purchase: any, business: any) => {
             <p style="font-size: 24px; font-weight: 900; margin: 0; color: ${themeColor};">${formatCurrency(purchase.total_amount)}</p>
           </div>
           <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 11px;">
-            <span>Paid:</span>
+            <span>Total Paid Amount:</span>
             <span style="font-weight: 700;">${formatCurrency(purchase.amount_paid || 0)}</span>
           </div>
-          <div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 11px;">
-            <span>Balance:</span>
+          ${(Number(purchase.cash_amount) > 0 || (purchase.payment_mode === 'cash' && Number(purchase.amount_paid) > 0)) ? `
+          <div style="display: flex; justify-content: space-between; margin-top: 2px; font-size: 10px; color: #475569;">
+            <span>• Cash Paid:</span>
+            <span>${formatCurrency(purchase.payment_mode === 'cash' ? (purchase.amount_paid || 0) : (purchase.cash_amount || 0))}</span>
+          </div>` : ''}
+          ${(Number(purchase.upi_amount) > 0 || (purchase.payment_mode === 'upi' && Number(purchase.amount_paid) > 0)) ? `
+          <div style="display: flex; justify-content: space-between; margin-top: 2px; font-size: 10px; color: #475569;">
+            <span>• UPI/Online Paid:</span>
+            <span>${formatCurrency(purchase.payment_mode === 'upi' ? (purchase.amount_paid || 0) : (purchase.upi_amount || 0))}</span>
+          </div>` : ''}
+          <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; padding-top: 5px; border-top: 1px dashed #cbd5e1;">
+            <span>Balance Due:</span>
             <span style="font-weight: 900; color: #ef4444;">${formatCurrency(purchase.balance_due || 0)}</span>
           </div>
         </div>
@@ -230,7 +240,17 @@ export const getInvoiceHTML = (invoice: Invoice, business: any) => {
             <span>Paid Amount:</span>
             <span>${formatCurrency(invoice.amount_paid || 0)}</span>
           </div>
-          <div style="display: flex; justify-content: space-between; margin-top: 2px; font-size: 10px; font-weight: bold;">
+          ${(Number(invoice.cash_amount) > 0 || (invoice.payment_mode === 'cash' && Number(invoice.amount_paid) > 0)) ? `
+          <div style="display: flex; justify-content: space-between; margin-top: 1px; font-size: 9px; color: #666;">
+            <span>- Cash:</span>
+            <span>${formatCurrency(invoice.payment_mode === 'cash' ? (invoice.amount_paid || 0) : (invoice.cash_amount || 0))}</span>
+          </div>` : ''}
+          ${(Number(invoice.upi_amount) > 0 || (invoice.payment_mode === 'upi' && Number(invoice.amount_paid) > 0)) ? `
+          <div style="display: flex; justify-content: space-between; margin-top: 1px; font-size: 9px; color: #666;">
+            <span>- UPI:</span>
+            <span>${formatCurrency(invoice.payment_mode === 'upi' ? (invoice.amount_paid || 0) : (invoice.upi_amount || 0))}</span>
+          </div>` : ''}
+          <div style="display: flex; justify-content: space-between; margin-top: 2px; font-size: 10px; font-weight: bold; border-top: 0.5px dashed #000; padding-top: 2px;">
             <span>Balance Due:</span>
             <span>${formatCurrency(Math.max(0, invoice.total_amount - (invoice.amount_paid || 0)))}</span>
           </div>
@@ -322,7 +342,17 @@ export const getInvoiceHTML = (invoice: Invoice, business: any) => {
               <span>Paid Amount</span>
               <span style="color: #059669; font-weight: 600;">${formatCurrency(invoice.amount_paid || 0)}</span>
             </div>
-            <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 15px; color: #64748b;">
+            ${(Number(invoice.cash_amount) > 0 || (invoice.payment_mode === 'cash' && Number(invoice.amount_paid) > 0)) ? `
+            <div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 13px; color: #94a3b8;">
+              <span>• Cash Paid</span>
+              <span>${formatCurrency(invoice.payment_mode === 'cash' ? (invoice.amount_paid || 0) : (invoice.cash_amount || 0))}</span>
+            </div>` : ''}
+            ${(Number(invoice.upi_amount) > 0 || (invoice.payment_mode === 'upi' && Number(invoice.amount_paid) > 0)) ? `
+            <div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 13px; color: #94a3b8;">
+              <span>• UPI/Online Paid</span>
+              <span>${formatCurrency(invoice.payment_mode === 'upi' ? (invoice.amount_paid || 0) : (invoice.upi_amount || 0))}</span>
+            </div>` : ''}
+            <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 15px; color: #64748b; padding-top: 10px; border-top: 1px solid #f1f5f9;">
               <span>Balance Due</span>
               <span style="color: #e11d48; font-weight: 800;">${formatCurrency(Math.max(0, invoice.total_amount - (invoice.amount_paid || 0)))}</span>
             </div>
@@ -474,10 +504,20 @@ export const getInvoiceHTML = (invoice: Invoice, business: any) => {
             <p style="font-size: 24px; font-weight: 900; margin: 0;">${formatCurrency(invoice.total_amount)}</p>
           </div>
           <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px;">
-            <span>Paid Amount:</span>
+            <span>Total Paid Amount:</span>
             <span style="font-weight: 700;">${formatCurrency(invoice.amount_paid || 0)}</span>
           </div>
-          <div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 12px;">
+          ${(Number(invoice.cash_amount) > 0 || (invoice.payment_mode === 'cash' && Number(invoice.amount_paid) > 0)) ? `
+          <div style="display: flex; justify-content: space-between; margin-top: 2px; font-size: 10px; color: #666;">
+            <span>• Cash Paid:</span>
+            <span>${formatCurrency(invoice.payment_mode === 'cash' ? (invoice.amount_paid || 0) : (invoice.cash_amount || 0))}</span>
+          </div>` : ''}
+          ${(Number(invoice.upi_amount) > 0 || (invoice.payment_mode === 'upi' && Number(invoice.amount_paid) > 0)) ? `
+          <div style="display: flex; justify-content: space-between; margin-top: 2px; font-size: 10px; color: #666;">
+            <span>• UPI/Online Paid:</span>
+            <span>${formatCurrency(invoice.payment_mode === 'upi' ? (invoice.amount_paid || 0) : (invoice.upi_amount || 0))}</span>
+          </div>` : ''}
+          <div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 12px; padding-top: 5px; border-top: 1px dashed #ccc;">
             <span>Balance Due:</span>
             <span style="font-weight: 900; color: #e11d48;">${formatCurrency(Math.max(0, invoice.total_amount - (invoice.amount_paid || 0)))}</span>
           </div>

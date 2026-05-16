@@ -317,14 +317,14 @@ export default function Reports() {
             <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/50 dark:border-slate-800">
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Total Invoiced</span>
               <span className="text-base font-black text-slate-900 dark:text-white">
-                {formatCurrency(reportStats.monthlySaleReport?.find((m: any) => m.month === reportMonth)?.total || 0)}
+                {formatCurrency(monthlySummary?.total_invoiced ?? reportStats.monthlySaleReport?.find((m: any) => m.month === reportMonth)?.total ?? 0)}
               </span>
             </div>
 
             <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/50 dark:border-slate-800">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Collections</span>
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Total Collection</span>
               <span className="text-base font-black text-indigo-600">
-                {formatCurrency((monthlySummary?.sales?.cash || 0) + (monthlySummary?.sales?.upi || 0))}
+                {formatCurrency(monthlySummary?.total_collection ?? (monthlySummary ? (monthlySummary.sales?.cash || 0) + (monthlySummary.sales?.upi || 0) : 0))}
               </span>
             </div>
 
@@ -826,13 +826,18 @@ export default function Reports() {
 
                 <button 
                   onClick={() => {
+                    const totalCollection = manualSummary.sales_cash + manualSummary.sales_upi;
+                    const totalPurchased = manualSummary.goods_cash + manualSummary.goods_upi;
                     setMonthlySummary({
+                      total_invoiced: reportStats.monthlySaleReport?.find((m: any) => m.month === reportMonth)?.total || totalCollection,
+                      total_collection: totalCollection,
+                      total_purchased: totalPurchased,
                       sales: { cash: manualSummary.sales_cash, upi: manualSummary.sales_upi },
                       goods: { cash: manualSummary.goods_cash, upi: manualSummary.goods_upi },
                       expenses: { cash: manualSummary.expenses_cash, upi: manualSummary.expenses_upi },
                       stillHave: { 
-                        cash: manualSummary.sales_cash - manualSummary.goods_cash - manualSummary.expenses_cash,
-                        upi: manualSummary.sales_upi - manualSummary.goods_upi - manualSummary.expenses_upi
+                         cash: manualSummary.sales_cash - manualSummary.goods_cash - manualSummary.expenses_cash,
+                         upi: manualSummary.sales_upi - manualSummary.goods_upi - manualSummary.expenses_upi
                       }
                     });
                     setIsSummaryModalOpen(false);

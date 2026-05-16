@@ -851,6 +851,30 @@ export default function Suppliers() {
                             <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
                               {formatCurrency(supplierPayments.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0))}
                             </p>
+                            <div className="mt-2 flex items-center gap-3 border-t border-emerald-100 dark:border-emerald-900/50 pt-2">
+                              <div>
+                                <p className="text-[8px] text-emerald-500 uppercase font-bold">Cash</p>
+                                <p className="text-[10px] font-black text-emerald-700 dark:text-emerald-300">
+                                  {formatCurrency(supplierPayments.reduce((acc, curr) => {
+                                    const amount = Number(curr.amount) || 0;
+                                    if (curr.payment_mode === 'cash') return acc + amount;
+                                    if (curr.payment_mode === 'both') return acc + (Number(curr.cash_amount) || 0);
+                                    return acc;
+                                  }, 0))}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-[8px] text-blue-500 uppercase font-bold">UPI</p>
+                                <p className="text-[10px] font-black text-blue-700 dark:text-blue-300">
+                                  {formatCurrency(supplierPayments.reduce((acc, curr) => {
+                                    const amount = Number(curr.amount) || 0;
+                                    if (curr.payment_mode === 'upi') return acc + amount;
+                                    if (curr.payment_mode === 'both') return acc + (Number(curr.upi_amount) || 0);
+                                    return acc;
+                                  }, 0))}
+                                </p>
+                              </div>
+                            </div>
                           </div>
                           <div className="p-5 bg-rose-50 dark:bg-rose-900/20 rounded-2xl border border-rose-100 dark:border-rose-900/30">
                             <p className="text-[10px] text-rose-600 dark:text-rose-400 uppercase font-black tracking-widest mb-1">Balance Due</p>
@@ -916,9 +940,20 @@ export default function Suppliers() {
                                   </div>
                                   <div>
                                     <p className="font-bold text-slate-900 dark:text-white">#{purchase.purchase_number}</p>
-                                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                                      {new Date(purchase.purchase_date).toLocaleDateString()}
-                                    </p>
+                                    <div className="flex items-center gap-2">
+                                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                                        {new Date(purchase.purchase_date).toLocaleDateString()}
+                                      </p>
+                                      <span className="text-[10px] text-slate-300 dark:text-slate-600">•</span>
+                                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">
+                                        {purchase.payment_mode === 'both' 
+                                          ? `Paid: ${formatCurrency(purchase.cash_amount)} (Cash) + ${formatCurrency(purchase.upi_amount)} (UPI)`
+                                          : purchase.payment_mode 
+                                            ? `${purchase.payment_mode === 'cash' ? 'Cash' : 'UPI'} Paid: ${formatCurrency(purchase.amount_paid)}`
+                                            : 'Credit Purchase'
+                                        }
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
                                 <div className="text-right">
@@ -951,9 +986,26 @@ export default function Suppliers() {
                                   </div>
                                   <div>
                                     <p className="font-bold text-slate-900 dark:text-white">{formatCurrency(payment.amount)}</p>
-                                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                                      {new Date(payment.payment_date).toLocaleDateString()} • {payment.payment_mode?.toUpperCase()}
-                                    </p>
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                                        {new Date(payment.payment_date).toLocaleDateString()}
+                                      </p>
+                                      {payment.payment_mode === 'both' ? (
+                                        <>
+                                          <span className="text-[10px] text-slate-300 dark:text-slate-600">•</span>
+                                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">Cash: {formatCurrency(payment.cash_amount)}</span>
+                                          <span className="text-[10px] text-slate-300 dark:text-slate-600">•</span>
+                                          <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">UPI: {formatCurrency(payment.upi_amount)}</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <span className="text-[10px] text-slate-300 dark:text-slate-600">•</span>
+                                          <span className="text-[10px] font-black uppercase tracking-tight text-slate-500">
+                                            {payment.payment_mode === 'cash' ? `Full Cash Payment` : `Full UPI Payment`}
+                                          </span>
+                                        </>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                                 <div className="text-right">

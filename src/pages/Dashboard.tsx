@@ -167,7 +167,7 @@ export default function Dashboard() {
             onClick={() => setShowTodayModal(true)}
           />
           <div className="px-2 py-1 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-900/30 flex justify-between items-center text-[10px]">
-            <span className="font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-tight">Pay-in:</span>
+            <span className="font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-tight">Collection:</span>
             <span className="font-black text-indigo-900 dark:text-indigo-200">{formatCurrency(stats?.todayCollections || 0)}</span>
           </div>
         </div>
@@ -181,7 +181,7 @@ export default function Dashboard() {
             onClick={() => setShowMonthlyModal(true)}
           />
           <div className="px-2 py-1 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-900/30 flex justify-between items-center text-[10px]">
-            <span className="font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-tight">Pay-in:</span>
+            <span className="font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-tight">Collection:</span>
             <span className="font-black text-emerald-900 dark:text-indigo-200">{formatCurrency(stats?.monthlyCollections || 0)}</span>
           </div>
         </div>
@@ -246,7 +246,7 @@ export default function Dashboard() {
                       <div className="w-10 h-10 bg-white dark:bg-slate-900 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-sm mb-3">
                         <Banknote size={20} />
                       </div>
-                      <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider mb-1">Cash</p>
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider mb-1">Sales (Cash)</p>
                       <p className="text-lg font-bold text-slate-900 dark:text-white">{formatCurrency(stats?.todayCashReceived || 0)}</p>
                     </div>
 
@@ -254,7 +254,7 @@ export default function Dashboard() {
                       <div className="w-10 h-10 bg-white dark:bg-slate-900 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-sm mb-3">
                         <Smartphone size={20} />
                       </div>
-                      <p className="text-xs text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider mb-1">Online (UPI)</p>
+                      <p className="text-xs text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider mb-1">Sales (UPI)</p>
                       <p className="text-lg font-bold text-slate-900 dark:text-white">{formatCurrency(stats?.todayOnlineReceived || 0)}</p>
                     </div>
                   </div>
@@ -265,7 +265,7 @@ export default function Dashboard() {
                       <p className="text-lg font-bold text-slate-900 dark:text-white">{formatCurrency(stats?.todaySales || 0)}</p>
                     </div>
                     <div className="flex items-center justify-between">
-                      <p className="text-slate-500 dark:text-slate-400 text-sm">Total Received (Pay-in)</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-sm">Total Received (Collection)</p>
                       <p className="text-xl font-black text-indigo-600 dark:text-indigo-400">{formatCurrency(stats?.todayCollections || 0)}</p>
                     </div>
                   </div>
@@ -329,7 +329,7 @@ export default function Dashboard() {
                       <div className="w-10 h-10 bg-white dark:bg-slate-900 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-sm mb-3">
                         <Banknote size={20} />
                       </div>
-                      <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider mb-1">Cash</p>
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider mb-1">Sales (Cash)</p>
                       <p className="text-lg font-bold text-slate-900 dark:text-white">{formatCurrency(stats?.monthlyCashReceived || 0)}</p>
                     </div>
 
@@ -337,18 +337,18 @@ export default function Dashboard() {
                       <div className="w-10 h-10 bg-white dark:bg-slate-900 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-sm mb-3">
                         <Smartphone size={20} />
                       </div>
-                      <p className="text-xs text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider mb-1">Online (UPI)</p>
+                      <p className="text-xs text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider mb-1">Sales (UPI)</p>
                       <p className="text-lg font-bold text-slate-900 dark:text-white">{formatCurrency(stats?.monthlyOnlineReceived || 0)}</p>
                     </div>
                   </div>
 
                   <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
                     <div className="flex items-center justify-between">
-                      <p className="text-slate-500 dark:text-slate-400 text-sm">Total Invoiced (Sales)</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-sm">Total Invoiced</p>
                       <p className="text-lg font-bold text-slate-900 dark:text-white">{formatCurrency(stats?.monthlySales || 0)}</p>
                     </div>
                     <div className="flex items-center justify-between">
-                      <p className="text-slate-500 dark:text-slate-400 text-sm">Total Received (Pay-in)</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-sm">Total Collection</p>
                       <p className="text-xl font-black text-emerald-600 dark:text-emerald-400">{formatCurrency(stats?.monthlyCollections || 0)}</p>
                     </div>
                   </div>

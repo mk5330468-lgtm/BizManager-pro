@@ -224,7 +224,13 @@ function AppContent() {
       if (user) {
         supabaseService.getBusiness()
           .then(setBusiness)
-          .catch(err => console.error('Failed to fetch business:', err));
+          .catch(err => {
+            console.error('Failed to fetch business:', err);
+            if (err.message?.includes('Business ID required')) {
+               console.warn('Retrying business fetch in 2s due to missing business ID...');
+               setTimeout(fetchBusiness, 2000);
+            }
+          });
       }
     };
 

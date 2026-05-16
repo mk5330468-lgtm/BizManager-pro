@@ -86,8 +86,8 @@ if (!process.env.SUPABASE_URL && fs.existsSync(envPath)) {
   }
 }
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const _filename = typeof import.meta !== 'undefined' && import.meta.url ? fileURLToPath(import.meta.url) : '';
+const _dirname = _filename ? path.dirname(_filename) : (typeof __dirname !== 'undefined' ? __dirname : process.cwd());
 
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
@@ -291,10 +291,18 @@ async function startServer() {
       const { businessId } = req;
       
       // 1. Get all financial records
+      // Income: customer payments
       const { data: payments } = await supabase.from('payments').select('amount, payment_mode').eq('business_id', businessId);
-      const { data: purchases } = await supabase.from('purchases').select('amount_paid, payment_mode').eq('business_id', businessId);
-      const { data: expenses } = await supabase.from('expenses').select('amount, payment_mode').eq('business_id', businessId);
       
+      // Outgo: supplier payments (includes initial and subsequent payments)
+      const { data: supplierPayments } = await supabase.from('supplier_payments').select('amount, payment_mode').eq('business_id', businessId);
+      
+      // Outgo: expenses
+      const { data: expenses } = await supabase.from('expenses').select('amount, payment_mode, cash_amount, upi_amount').eq('business_id', businessId);
+      
+      // Fallback: legacy purchases (only those without supplier_payments)
+      const { data: allPurchases } = await supabase.from('purchases').select('id, amount_paid, payment_mode, cash_amount, upi_amount').eq('business_id', businessId);
+
       const balances: Record<string, number> = {
         'cash': 0,
         'upi': 0
@@ -302,22 +310,53 @@ async function startServer() {
 
       // Sum payments (income)
       payments?.forEach(p => {
-        if (p.payment_mode && balances.hasOwnProperty(p.payment_mode)) {
-          balances[p.payment_mode] += Number(p.amount) || 0;
+        if (p.payment_mode === 'cash') balances.cash += Number(p.amount) || 0;
+        else if (p.payment_mode === 'upi') balances.upi += Number(p.amount) || 0;
+        else if (p.payment_mode === 'both') {
+           // Standard payments table doesn't have cash_amount/upi_amount usually, 
+           // but if they exist in some version, we should check.
+           // However based on schema, they don't. 
+           // But if it is 'both', it should probably have been two entries. 
+           // If we encounter 'both' here, we'll try to use cash_amount/upi_amount if present.
+           balances.cash += Number((p as any).cash_amount) || 0;
+           balances.upi += Number((p as any).upi_amount) || 0;
         }
       });
 
-      // Subtract purchases (expense)
-      purchases?.forEach(p => {
-        if (p.payment_mode && balances.hasOwnProperty(p.payment_mode)) {
-          balances[p.payment_mode] -= Number(p.amount_paid) || 0;
+      // Subtract supplier payments (outgo)
+      supplierPayments?.forEach(p => {
+        if (p.payment_mode === 'cash') balances.cash -= Number(p.amount) || 0;
+        else if (p.payment_mode === 'upi') balances.upi -= Number(p.amount) || 0;
+        else if (p.payment_mode === 'both') {
+          balances.cash -= Number(p.cash_amount) || 0;
+          balances.upi -= Number(p.upi_amount) || 0;
         }
       });
 
-      // Subtract expenses (expense)
+      // Subtract legacy purchases (if any)
+      const purchaseIdsInSupplierPayments = new Set(supplierPayments?.map(p => p.purchase_id).filter(Boolean));
+      allPurchases?.forEach(p => {
+        if (!purchaseIdsInSupplierPayments.has(p.id)) {
+          if (p.payment_mode === 'both') {
+            balances.cash -= Number(p.cash_amount) || 0;
+            balances.upi -= Number(p.upi_amount) || 0;
+          } else if (p.payment_mode === 'cash') {
+            balances.cash -= Number(p.amount_paid) || 0;
+          } else if (p.payment_mode === 'upi') {
+            balances.upi -= Number(p.amount_paid) || 0;
+          }
+        }
+      });
+
+      // Subtract expenses (outgo)
       expenses?.forEach(e => {
-        if (e.payment_mode && balances.hasOwnProperty(e.payment_mode)) {
-          balances[e.payment_mode] -= Number(e.amount) || 0;
+        if (e.payment_mode === 'both') {
+          balances.cash -= Number(e.cash_amount) || 0;
+          balances.upi -= Number(e.upi_amount) || 0;
+        } else if (e.payment_mode === 'cash') {
+          balances.cash -= Number(e.amount) || 0;
+        } else if (e.payment_mode === 'upi') {
+          balances.upi -= Number(e.amount) || 0;
         }
       });
 
@@ -325,9 +364,12 @@ async function startServer() {
       for (const [name, balance] of Object.entries(balances)) {
         await supabase
           .from('accounts')
-          .update({ balance, last_updated: new Date().toISOString() })
-          .eq('business_id', businessId)
-          .eq('name', name);
+          .upsert({ 
+            business_id: businessId, 
+            name, 
+            balance, 
+            last_updated: new Date().toISOString() 
+          }, { onConflict: 'business_id,name' });
       }
 
       res.json({ success: true, balances });
@@ -362,11 +404,15 @@ async function startServer() {
     // If we reach here, no valid business ID was found
     req.businessId = null;
     
+    // Log the failure for debugging
+    console.warn(`[API AUTH] Business ID required for ${req.path}. Header present: ${!!headerId}, Method: ${req.method}`);
+    
     // Return early for routes that strictly require business ID
     // We'll allow it specifically for health and public routes (checked above)
     return res.status(400).json({ 
       error: "Business ID required", 
-      message: "A valid business UUID must be provided in the x-business-id header."
+      message: "A valid business UUID must be provided in the x-business-id header.",
+      path: req.path
     });
   });
 
@@ -430,14 +476,15 @@ async function startServer() {
     // --- End Schema Migration ---
 
     try {
-      const buckets = ['invoices', 'business_logos'];
+      const buckets = ['invoices', 'business_logos', 'backups'];
       const { data: existingBuckets } = await supabase.storage.listBuckets();
       
       for (const bucketName of buckets) {
         const exists = existingBuckets?.find(b => b.name === bucketName);
         if (!exists) {
           console.log(`Creating bucket: ${bucketName}`);
-          const { error: createError } = await supabase.storage.createBucket(bucketName, { public: true });
+          const isPublic = bucketName !== 'backups';
+          const { error: createError } = await supabase.storage.createBucket(bucketName, { public: isPublic });
           if (createError) {
             if (createError.message.includes('already exists')) {
               console.log(`Bucket ${bucketName} already exists.`);
@@ -551,7 +598,8 @@ async function startServer() {
         supabase.from('invoices').select('id, total_amount').eq('business_id', businessId),
         supabase.from('customers').select('outstanding_balance').eq('business_id', businessId),
         supabase.from('products').select('id, stock_quantity, low_stock_alert').eq('business_id', businessId),
-        supabase.from('accounts').select('*').eq('business_id', businessId)
+        supabase.from('accounts').select('*').eq('business_id', businessId),
+        supabase.from('purchases').select('total_amount').eq('business_id', businessId).gte('purchase_date', monthStart)
       ];
 
       debugLogs.push("Executing parallel queries...");
@@ -586,10 +634,13 @@ async function startServer() {
         { data: allInvoicesData },
         { data: customersData },
         { data: productsData },
-        { data: accountsData }
+        { data: accountsData },
+        { data: monthlyPurchasesData }
       ] = results;
       
       debugLogs.push("Data destructured successfully");
+
+      const monthlyPurchasesTotal = monthlyPurchasesData?.reduce((sum: number, p: any) => sum + (Number(p.total_amount) || 0), 0) || 0;
 
       // Fallback for payment modes
       const summary: any = {};
@@ -604,14 +655,26 @@ async function startServer() {
       debugLogs.push(`Calculated ${finalPaymentModes.length} payment modes`);
 
       const todayCollections = todayPayments?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0;
-      const todayCashReceived = todayPayments?.filter((p: any) => p.payment_mode?.toLowerCase() === 'cash').reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0;
-      const todayOnlineReceived = todayPayments?.filter((p: any) => p.payment_mode?.toLowerCase() === 'upi').reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0;
+      let todayCashReceived = 0;
+      let todayOnlineReceived = 0;
+      
+      todayPayments?.forEach((p: any) => {
+        if (p.payment_mode?.toLowerCase() === 'cash') todayCashReceived += (p.amount || 0);
+        else if (p.payment_mode?.toLowerCase() === 'upi') todayOnlineReceived += (p.amount || 0);
+      });
+      
       const todayInvoicesTotal = todayInvoices?.reduce((sum: number, i: any) => sum + (i.total_amount || 0), 0) || 0;
       const todayInvoicesCount = todayInvoices?.length || 0;
-
+      
       const monthlyCollections = monthlyPayments?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0;
-      const monthlyCashReceived = monthlyPayments?.filter((p: any) => p.payment_mode?.toLowerCase() === 'cash').reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0;
-      const monthlyOnlineReceived = monthlyPayments?.filter((p: any) => p.payment_mode?.toLowerCase() === 'upi').reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0;
+      let monthlyCashReceived = 0;
+      let monthlyOnlineReceived = 0;
+      
+      monthlyPayments?.forEach((p: any) => {
+        if (p.payment_mode?.toLowerCase() === 'cash') monthlyCashReceived += (p.amount || 0);
+        else if (p.payment_mode?.toLowerCase() === 'upi') monthlyOnlineReceived += (p.amount || 0);
+      });
+
       const monthlyInvoicesTotal = monthlyInvoices?.reduce((sum: number, i: any) => sum + (i.total_amount || 0), 0) || 0;
       const monthlyInvoicesCount = monthlyInvoices?.length || 0;
 
@@ -651,6 +714,7 @@ async function startServer() {
         monthlyOnlineReceived,
         totalSales,
         totalCollections,
+        monthlyPurchases: monthlyPurchasesTotal,
         paymentModes: finalPaymentModes,
         pendingPayments,
         lowStockCount,
@@ -898,6 +962,206 @@ async function startServer() {
       const { data } = supabase.storage.from(bucket as string).getPublicUrl(path as string);
       res.json({ url: data.publicUrl });
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // --- Backup & Restore Endpoints ---
+
+  const ALL_BACKUP_TABLES = [
+    'products', 'customers', 'suppliers', 'invoices', 'invoice_items', 
+    'purchases', 'purchase_items', 'payments', 'supplier_payments', 
+    'expenses', 'accounts'
+  ];
+
+  const fetchAllBusinessData = async (businessId: string) => {
+    const backup: any = { businessId, timestamp: new Date().toISOString(), data: {} };
+    
+    // Fetch profile
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', businessId).single();
+    backup.data.profiles = profile ? [profile] : [];
+
+    // Fetch all other tables in parallel
+    const results = await Promise.all(ALL_BACKUP_TABLES.map(table => 
+      supabase.from(table).select('*').eq('business_id', businessId)
+    ));
+
+    ALL_BACKUP_TABLES.forEach((table, index) => {
+      backup.data[table] = results[index].data || [];
+    });
+
+    return backup;
+  };
+
+  const importBusinessData = async (businessId: string, backupData: any) => {
+    if (!backupData || !backupData.profiles || backupData.profiles.length === 0) {
+      throw new Error("Invalid backup data: missing business profile");
+    }
+
+    // 1. Update Profile (don't delete)
+    const profile = backupData.profiles[0];
+    const { id, created_at, updated_at, ...profileUpdates } = profile;
+    await supabase.from('profiles').update(profileUpdates).eq('id', businessId);
+
+    // 2. Clear all other data for this business
+    // We do this in reverse dependency order if possible, or just all at once since we have CASCADE or SET NULL on some, 
+    // but CASCADE is safer here.
+    // Actually, SQL order matters if there are no cascades.
+    const tablesToDelete = [
+      'invoice_items', 'purchase_items', 'payments', 'supplier_payments',
+      'invoices', 'purchases', 'expenses', 'accounts', 'products', 'customers', 'suppliers'
+    ];
+
+    for (const table of tablesToDelete) {
+      await supabase.from(table).delete().eq('business_id', businessId);
+    }
+
+    // 3. Re-insert data
+    // Dependency order:
+    // 1. Independent: products, customers, suppliers, accounts, expenses
+    // 2. Dependent: invoices (customers), purchases (suppliers)
+    // 3. Highly Dependent: invoice_items, purchase_items, payments, supplier_payments
+
+    const insertGroup1 = ['products', 'customers', 'suppliers', 'accounts', 'expenses'];
+    const insertGroup2 = ['invoices', 'purchases'];
+    const insertGroup3 = ['invoice_items', 'purchase_items', 'payments', 'supplier_payments'];
+
+    for (const table of insertGroup1) {
+      const data = backupData[table];
+      if (data && data.length > 0) {
+        // Ensure business_id is set correctly and remove IDs for Generates Always columns if needed, 
+        // but Supabase might fail if we try to insert PKs. 
+        // However, for backup/restore, we WANT to keep IDs for references to work.
+        const cleanedData = data.map((item: any) => ({ ...item, business_id: businessId }));
+        const { error } = await supabase.from(table).insert(cleanedData);
+        if (error) console.error(`Error inserting ${table}:`, error);
+      }
+    }
+
+    for (const table of insertGroup2) {
+      const data = backupData[table];
+      if (data && data.length > 0) {
+        const cleanedData = data.map((item: any) => ({ ...item, business_id: businessId }));
+        const { error } = await supabase.from(table).insert(cleanedData);
+        if (error) console.error(`Error inserting ${table}:`, error);
+      }
+    }
+
+    for (const table of insertGroup3) {
+      const data = backupData[table];
+      if (data && data.length > 0) {
+        const cleanedData = data.map((item: any) => ({ ...item, business_id: businessId }));
+        const { error } = await supabase.from(table).insert(cleanedData);
+        if (error) console.error(`Error inserting ${table}:`, error);
+      }
+    }
+  };
+
+  app.get("/api/backup/export", async (req: any, res) => {
+    try {
+      const { businessId } = req;
+      const data = await fetchAllBusinessData(businessId);
+      res.json(data.data);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/backup/import", async (req: any, res) => {
+    try {
+      const { businessId } = req;
+      const backupData = req.body;
+      await importBusinessData(businessId, backupData);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/backup/cloud-sync", async (req: any, res) => {
+    try {
+      const { businessId } = req;
+      const data = await fetchAllBusinessData(businessId);
+      const fileName = `${businessId}/backup_latest.json`;
+      
+      // Ensure bucket exists first to avoid issues
+      try {
+        const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+        if (listError) throw listError;
+        
+        if (!buckets?.find((b: any) => b.name === 'backups')) {
+          const { error: createError } = await supabase.storage.createBucket('backups', { 
+            public: false,
+            fileSizeLimit: 52428800 // 50MB
+          });
+          if (createError && !createError.message.includes('already exists')) {
+             console.error("Bucket creation failed:", createError);
+          }
+          // Optional: wait a bit for bucket to propagate in internal Supabase systems
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+      } catch (bucketErr) {
+        console.warn("Storage bucket check/create failed, continuing anyway:", bucketErr);
+      }
+
+      const { error } = await supabase.storage
+        .from('backups')
+        .upload(fileName, JSON.stringify(data), {
+          contentType: 'application/json',
+          upsert: true
+        });
+
+      if (error) {
+        // Retry logic if bucket was just created but still not found by upload or other transient error
+        const errorMsg = error.message.toLowerCase();
+        if (errorMsg.includes('bucket not found')) {
+           console.log("Bucket not found during upload, attempting one last create/wait/retry...");
+           await supabase.storage.createBucket('backups', { public: false }).catch(() => {});
+           await new Promise(resolve => setTimeout(resolve, 2000));
+           const { error: retryError } = await supabase.storage
+            .from('backups')
+            .upload(fileName, JSON.stringify(data), {
+              contentType: 'application/json',
+              upsert: true
+            });
+          if (retryError) throw retryError;
+        } else {
+          throw error;
+        }
+      }
+
+      res.json({ success: true, timestamp: data.timestamp });
+    } catch (error: any) {
+      console.error("Cloud sync error:", error);
+      res.status(500).json({ error: error.message || "Cloud sync failed" });
+    }
+  });
+
+  app.post("/api/backup/cloud-restore", async (req: any, res) => {
+    try {
+      const { businessId } = req;
+      const fileName = `${businessId}/backup_latest.json`;
+      
+      const { data, error } = await supabase.storage
+        .from('backups')
+        .download(fileName);
+
+      if (error) {
+        const errorMsg = error.message.toLowerCase();
+        if (errorMsg.includes('bucket not found')) {
+          // If bucket doesn't exist, it definitely doesn't have the backup
+          throw new Error("No backups found in cloud storage (Bucket missing)");
+        }
+        throw error;
+      }
+      
+      const text = await data.text();
+      const backup = JSON.parse(text);
+      
+      await importBusinessData(businessId, backup.data);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Cloud restore error:", error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -1745,7 +2009,7 @@ async function startServer() {
     try {
       let { data, error } = await supabase
         .from('purchases')
-        .select('id, business_id, purchase_number, supplier_id, supplier_name, invoice_number, subtotal, tax_amount, discount_amount, additional_charges, total_amount, balance_due, payment_status, payment_mode, purchase_date, amount_paid')
+        .select('id, business_id, purchase_number, supplier_id, supplier_name, invoice_number, subtotal, tax_amount, discount_amount, additional_charges, total_amount, balance_due, payment_status, payment_mode, purchase_date, amount_paid, cash_amount, upi_amount')
         .eq('business_id', req.businessId)
         .order('purchase_date', { ascending: false });
       
@@ -1754,7 +2018,7 @@ async function startServer() {
         if (error.code === '42703' || error.message.includes('supplier_id') || error.message.includes('does not exist')) {
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('purchases')
-            .select('id, business_id, purchase_number, supplier_name, invoice_number, subtotal, tax_amount, discount_amount, additional_charges, total_amount, balance_due, payment_status, payment_mode, purchase_date, amount_paid')
+            .select('id, business_id, purchase_number, supplier_name, invoice_number, subtotal, tax_amount, discount_amount, additional_charges, total_amount, balance_due, payment_status, payment_mode, purchase_date, amount_paid, cash_amount, upi_amount')
             .eq('business_id', req.businessId)
             .order('purchase_date', { ascending: false });
           
@@ -1775,6 +2039,34 @@ async function startServer() {
       res.json(formattedData);
     } catch (error: any) {
       console.error("Fetch purchases error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/purchases/:id", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { data, error } = await supabase
+        .from('purchases')
+        .select('*')
+        .eq('id', id)
+        .eq('business_id', req.businessId)
+        .limit(1);
+      
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        return res.status(404).json({ error: "Purchase not found" });
+      }
+      
+      const purchase = data[0];
+      res.json({
+        ...purchase,
+        amount_paid: purchase.amount_paid !== undefined && purchase.amount_paid !== null ? purchase.amount_paid : (purchase.total_amount - (purchase.balance_due || 0)),
+        cash_amount: purchase.cash_amount || 0,
+        upi_amount: purchase.upi_amount || 0
+      });
+    } catch (error: any) {
+      console.error("Fetch purchase by ID error:", error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -1841,6 +2133,8 @@ async function startServer() {
         additional_charges: additional_charges || 0,
         total_amount,
         amount_paid: Number(amount_paid) || 0,
+        cash_amount: Number(cash_amount) || 0,
+        upi_amount: Number(upi_amount) || 0,
         balance_due: balance_due || 0,
         payment_status: payment_status || 'paid',
         payment_mode
@@ -1851,7 +2145,7 @@ async function startServer() {
       let { data: purchase, error: pError } = await supabase
         .from('purchases')
         .insert([insertData])
-        .select('id, business_id, purchase_number, supplier_id, supplier_name, invoice_number, subtotal, tax_amount, discount_amount, additional_charges, total_amount, balance_due, payment_status, payment_mode, purchase_date, amount_paid')
+        .select('id, business_id, purchase_number, supplier_id, supplier_name, invoice_number, subtotal, tax_amount, discount_amount, additional_charges, total_amount, balance_due, payment_status, payment_mode, purchase_date, amount_paid, cash_amount, upi_amount')
         .single();
 
       if (pError) {
@@ -1861,7 +2155,7 @@ async function startServer() {
           const { data: fallbackPurchase, error: fallbackError } = await supabase
             .from('purchases')
             .insert([insertData])
-            .select('id, business_id, purchase_number, supplier_name, invoice_number, subtotal, tax_amount, discount_amount, additional_charges, total_amount, balance_due, payment_status, payment_mode, purchase_date, amount_paid')
+            .select('id, business_id, purchase_number, supplier_name, invoice_number, subtotal, tax_amount, discount_amount, additional_charges, total_amount, balance_due, payment_status, payment_mode, purchase_date, amount_paid, cash_amount, upi_amount')
             .single();
           
           if (fallbackError) throw fallbackError;
@@ -1915,6 +2209,8 @@ async function startServer() {
               purchase_id: purchaseId,
               amount: cash,
               payment_mode: 'cash',
+              cash_amount: cash,
+              upi_amount: 0,
               payment_date: purchase_date || new Date().toISOString(),
               notes: `Initial payment at purchase (Cash Part)`
             }]);
@@ -1928,6 +2224,8 @@ async function startServer() {
               purchase_id: purchaseId,
               amount: upi,
               payment_mode: 'upi',
+              cash_amount: 0,
+              upi_amount: upi,
               payment_date: purchase_date || new Date().toISOString(),
               notes: `Initial payment at purchase (UPI Part)`
             }]);
@@ -1940,6 +2238,8 @@ async function startServer() {
             purchase_id: purchaseId,
             amount: Number(amount_paid),
             payment_mode,
+            cash_amount: payment_mode === 'cash' ? Number(amount_paid) : 0,
+            upi_amount: payment_mode === 'upi' ? Number(amount_paid) : 0,
             payment_date: purchase_date || new Date().toISOString(),
             notes: `Initial payment at purchase`
           }]);
@@ -1964,29 +2264,33 @@ async function startServer() {
     const businessId = req.businessId;
 
     try {
-      // 1. Get purchase details and items
-      let { data: purchase, error: pError } = await supabase
+      // 1. Get purchase details and items using a safer pattern than .single()
+      const { data: purchaseResults, error: pError } = await supabase
         .from('purchases')
         .select('id, business_id, purchase_number, supplier_id, supplier_name, invoice_number, subtotal, tax_amount, discount_amount, additional_charges, total_amount, balance_due, payment_status, payment_mode, purchase_date, amount_paid, cash_amount, upi_amount')
         .eq('id', id)
         .eq('business_id', businessId)
-        .single();
+        .limit(1);
 
-      if (pError) {
-        // Fallback for missing supplier_id column
-        if (pError.code === '42703' || pError.message.includes('supplier_id') || pError.message.includes('does not exist')) {
-          const { data: fallbackPurchase, error: fallbackError } = await supabase
+      if (pError || !purchaseResults || purchaseResults.length === 0) {
+        // Fallback attempt for missing supplier_id column if that was the issue
+        if (pError && (pError.code === '42703' || pError.message.includes('supplier_id'))) {
+          const { data: fbResults, error: fbError } = await supabase
             .from('purchases')
             .select('id, business_id, purchase_number, supplier_name, invoice_number, subtotal, tax_amount, discount_amount, additional_charges, total_amount, balance_due, payment_status, payment_mode, purchase_date, amount_paid, cash_amount, upi_amount')
             .eq('id', id)
             .eq('business_id', businessId)
-            .single();
+            .limit(1);
           
-          if (fallbackError) throw fallbackError;
-          purchase = fallbackPurchase;
+          if (fbError || !fbResults || fbResults.length === 0) {
+            throw fbError || new Error("Purchase not found or unauthorized");
+          }
+          var purchase = fbResults[0];
         } else {
           throw pError || new Error("Purchase not found or unauthorized");
         }
+      } else {
+        var purchase = purchaseResults[0];
       }
 
       if (!purchase) throw new Error("Purchase not found or unauthorized");
@@ -2121,7 +2425,8 @@ async function startServer() {
       balance_due,
       payment_status,
       payment_mode: raw_payment_mode, 
-      items 
+      items,
+      supplier_id: incoming_supplier_id
     } = req.body;
 
     const payment_mode = (raw_payment_mode === 'cash' || raw_payment_mode === 'upi' || raw_payment_mode === 'both') 
@@ -2129,110 +2434,98 @@ async function startServer() {
       : (payment_status === 'unpaid' ? null : 'cash');
 
     try {
-      // 1. Get old purchase details and items
-      const { data: oldPurchase, error: pError } = await supabase
+      // 1. Get old purchase details safely
+      const { data: purchaseResults, error: pError } = await supabase
         .from('purchases')
         .select('*')
         .eq('id', id)
         .eq('business_id', businessId)
-        .single();
+        .limit(1);
 
-      if (pError || !oldPurchase) throw new Error("Purchase not found or unauthorized");
+      if (pError || !purchaseResults || purchaseResults.length === 0) {
+        throw pError || new Error("Purchase not found or unauthorized");
+      }
+      const oldPurchase = purchaseResults[0];
 
-      const { data: oldItems, error: iError } = await supabase
+      // 2. Reverse OLD stock, supplier balance, and account balances
+      // Reverse stock
+      const { data: oldItems } = await supabase
         .from('purchase_items')
         .select('*')
         .eq('purchase_id', id);
 
-      if (iError) throw iError;
-
-      // 2. Reverse old stock updates (Parallelized)
-      if (oldItems && oldItems.length > 0) {
-        await Promise.all(oldItems.map(async (item: any) => {
+      if (oldItems) {
+        for (const item of oldItems) {
           try {
-            const { error: rpcError } = await supabase.rpc('decrement_stock', {
-              p_id: item.product_id,
-              qty: item.quantity,
-              b_id: businessId
-            });
-            if (rpcError) throw rpcError;
+            await supabase.rpc('decrement_stock', { p_id: item.product_id, qty: item.quantity, b_id: businessId });
           } catch (e) {
             const { data: p } = await supabase.from('products').select('stock_quantity').eq('id', item.product_id).single();
             if (p) await supabase.from('products').update({ stock_quantity: p.stock_quantity - item.quantity }).eq('id', item.product_id);
           }
-        }));
+        }
       }
 
-      // 3. Reverse account balance and supplier balance updates of the OLD record
-      const { data: associatedPayments, error: apError } = await supabase
-        .from('supplier_payments')
-        .select('id, amount, payment_mode, cash_amount, upi_amount')
-        .eq('purchase_id', id)
-        .eq('business_id', businessId);
+      // Reverse supplier balance
+      const oldPaid = Number(oldPurchase.amount_paid) || 0;
+      const oldTotal = Number(oldPurchase.total_amount) || 0;
+      const oldOutstanding = oldTotal - oldPaid;
       
-      const oldPayments = associatedPayments || [];
-      
-      // Determine effective old supplier ID
       let effectiveOldSupplierId = oldPurchase.supplier_id ? Number(oldPurchase.supplier_id) : null;
       if (!effectiveOldSupplierId && oldPurchase.supplier_name) {
-        const { data: sup } = await supabase
+        const { data: supResults } = await supabase
           .from('suppliers')
           .select('id')
           .eq('name', oldPurchase.supplier_name)
           .eq('business_id', businessId)
-          .single();
-        if (sup) effectiveOldSupplierId = sup.id;
-      }
-
-      // 3a. Reverse all payments (including initial ones if they are in supplier_payments)
-      for (const payment of oldPayments) {
-        if (payment.payment_mode === 'both') {
-          if (Number(payment.cash_amount) > 0) await updateAccountBalance(businessId, 'cash', Number(payment.cash_amount), 'increment');
-          if (Number(payment.upi_amount) > 0) await updateAccountBalance(businessId, 'upi', Number(payment.upi_amount), 'increment');
-        } else if (payment.payment_mode && Number(payment.amount) > 0) {
-          await updateAccountBalance(businessId, payment.payment_mode, Number(payment.amount), 'increment');
-        }
-
-        // Reverse impact on supplier balance
-        if (effectiveOldSupplierId && Number(payment.amount) > 0) {
-          await updateSupplierBalance(businessId, effectiveOldSupplierId, Number(payment.amount), 'increment');
+          .limit(1);
+        if (supResults && supResults.length > 0) {
+          effectiveOldSupplierId = supResults[0].id;
         }
       }
 
-      // 3b. Handle legacy initial payments (those NOT in supplier_payments)
-      const totalInOldPayments = oldPayments.reduce((sum, p) => sum + Number(p.amount), 0);
-      const initialPaidLegacy = Math.max(0, Number(oldPurchase.amount_paid) - totalInOldPayments);
-      
-      if (initialPaidLegacy > 0 && oldPurchase.payment_mode) {
-        if (oldPurchase.payment_mode === 'both') {
-          const cashPt = Number(oldPurchase.cash_amount || 0);
-          const upiPt = Number(oldPurchase.upi_amount || 0);
-          if (cashPt + upiPt === initialPaidLegacy) {
-            if (cashPt > 0) await updateAccountBalance(businessId, 'cash', cashPt, 'increment');
-            if (upiPt > 0) await updateAccountBalance(businessId, 'upi', upiPt, 'increment');
-          } else {
-            await updateAccountBalance(businessId, 'cash', initialPaidLegacy, 'increment');
+      if (effectiveOldSupplierId && oldOutstanding !== 0) {
+        await updateSupplierBalance(businessId, effectiveOldSupplierId, Math.abs(oldOutstanding), oldOutstanding > 0 ? 'decrement' : 'increment');
+      }
+
+      // Reverse account balances from OLD supplier_payments
+      const { data: oldPayments } = await supabase
+        .from('supplier_payments')
+        .select('*')
+        .eq('purchase_id', id);
+
+      if (oldPayments && oldPayments.length > 0) {
+        for (const p of oldPayments) {
+          // If we paid out previously, the account balance decreased. Reversing means increment.
+          if (p.payment_mode === 'both') {
+            if (Number(p.cash_amount) > 0) await updateAccountBalance(businessId, 'cash', Number(p.cash_amount), 'increment');
+            if (Number(p.upi_amount) > 0) await updateAccountBalance(businessId, 'upi', Number(p.upi_amount), 'increment');
+          } else if (p.payment_mode) {
+            await updateAccountBalance(businessId, p.payment_mode, p.amount, 'increment');
           }
+        }
+      } else if (oldPurchase.amount_paid > 0 && oldPurchase.payment_mode) {
+        // Fallback reversal using purchase fields
+        if (oldPurchase.payment_mode === 'both') {
+          const cash = Number(oldPurchase.cash_amount) || 0;
+          const upi = Number(oldPurchase.upi_amount) || 0;
+          if (cash > 0) await updateAccountBalance(businessId, 'cash', cash, 'increment');
+          if (upi > 0) await updateAccountBalance(businessId, 'upi', upi, 'increment');
         } else {
-          await updateAccountBalance(businessId, oldPurchase.payment_mode, initialPaidLegacy, 'increment');
-        }
-
-        if (effectiveOldSupplierId) {
-          await updateSupplierBalance(businessId, effectiveOldSupplierId, initialPaidLegacy, 'increment');
+          await updateAccountBalance(businessId, oldPurchase.payment_mode, Number(oldPurchase.amount_paid), 'increment');
         }
       }
 
-      // 3c. Reverse the entire debt of the old purchase
-      if (effectiveOldSupplierId && Number(oldPurchase.total_amount || 0) > 0) {
-        await updateSupplierBalance(businessId, effectiveOldSupplierId, Number(oldPurchase.total_amount), 'decrement');
-      }
-
-      // 3d. Delete the old payment records
-      if (oldPayments.length > 0) {
-        await supabase.from('supplier_payments').delete().eq('purchase_id', id).eq('business_id', businessId);
-      }
+      // 3. Delete old related records
+      await Promise.all([
+        supabase.from('purchase_items').delete().eq('purchase_id', id),
+        supabase.from('supplier_payments').delete().eq('purchase_id', id)
+      ]);
 
       // 4. Update purchase record
+      const newTotal = Number(total_amount) || 0;
+      const newPaid = Number(amount_paid) || 0;
+      const finalSupplierId = incoming_supplier_id || effectiveOldSupplierId;
+
       const updateData: any = {
         supplier_name,
         purchase_number,
@@ -2242,59 +2535,27 @@ async function startServer() {
         tax_amount: tax_amount || 0,
         discount_amount: discount_amount || 0,
         additional_charges: additional_charges || 0,
-        total_amount,
-        amount_paid: Number(amount_paid) || 0,
+        total_amount: newTotal,
+        amount_paid: newPaid,
         cash_amount: Number(cash_amount) || 0,
         upi_amount: Number(upi_amount) || 0,
         balance_due: balance_due || 0,
         payment_status: payment_status || 'paid',
-        payment_mode
+        payment_mode,
+        supplier_id: finalSupplierId
       };
 
-      if (req.body.supplier_id) updateData.supplier_id = req.body.supplier_id;
-
-      let { data: updatedPurchase, error: updateError } = await supabase
+      const { data: updatedPurchase, error: updateError } = await supabase
         .from('purchases')
         .update(updateData)
         .eq('id', id)
         .eq('business_id', businessId)
-        .select('id, business_id, purchase_number, supplier_id, supplier_name, invoice_number, subtotal, tax_amount, discount_amount, additional_charges, total_amount, balance_due, payment_status, payment_mode, purchase_date, amount_paid')
+        .select('*')
         .single();
- 
-      if (updateError) {
-        // Fallback for missing supplier_id column
-        if (updateError.code === '42703' || updateError.message.includes('supplier_id') || updateError.message.includes('does not exist')) {
-          delete updateData.supplier_id;
-          const { data: fallbackUpdate, error: fallbackError } = await supabase
-            .from('purchases')
-            .update(updateData)
-            .eq('id', id)
-            .eq('business_id', businessId)
-            .select('id, business_id, purchase_number, supplier_name, invoice_number, subtotal, tax_amount, discount_amount, additional_charges, total_amount, balance_due, payment_status, payment_mode, purchase_date, amount_paid')
-            .single();
-          
-          if (fallbackError) throw fallbackError;
-          updatedPurchase = fallbackUpdate;
-        } else {
-          throw updateError;
-        }
-      }
 
-      // Determine effective new supplier ID
-      let effectiveNewSupplierId = updatedPurchase.supplier_id ? Number(updatedPurchase.supplier_id) : null;
-      if (!effectiveNewSupplierId && updatedPurchase.supplier_name) {
-        const { data: sup } = await supabase
-          .from('suppliers')
-          .select('id')
-          .eq('name', updatedPurchase.supplier_name)
-          .eq('business_id', businessId)
-          .single();
-        if (sup) effectiveNewSupplierId = sup.id;
-      }
+      if (updateError) throw updateError;
 
-      // 5. Delete old items and insert new ones (Parallelized)
-      await supabase.from('purchase_items').delete().eq('purchase_id', id);
-      
+      // 5. Apply NEW items and stock
       if (items && items.length > 0) {
         const itemInsertions = items.map((item: any) => ({
           business_id: businessId,
@@ -2304,76 +2565,52 @@ async function startServer() {
           price: item.price,
           total: item.total
         }));
+        await supabase.from('purchase_items').insert(itemInsertions);
         
-        const insertPromise = supabase.from('purchase_items').insert(itemInsertions);
-
-        const stockPromise = Promise.all(items.map(async (item: any) => {
+        for (const item of items) {
           try {
-            const { error: rpcError } = await supabase.rpc('increment_stock', {
-              p_id: item.product_id,
-              qty: item.quantity,
-              b_id: businessId
-            });
-            if (rpcError) throw rpcError;
+            await supabase.rpc('increment_stock', { p_id: item.product_id, qty: item.quantity, b_id: businessId });
           } catch (e) {
             const { data: p } = await supabase.from('products').select('stock_quantity').eq('id', item.product_id).single();
             if (p) await supabase.from('products').update({ stock_quantity: p.stock_quantity + item.quantity }).eq('id', item.product_id);
           }
-        }));
-
-        await Promise.all([insertPromise, stockPromise]);
+        }
       }
 
-      // 6. Apply new supplier debt (Total amount increases debt)
-      if (effectiveNewSupplierId && Number(total_amount) > 0) {
-        await updateSupplierBalance(businessId, effectiveNewSupplierId, Number(total_amount), 'increment');
+      // 6. Apply NEW supplier balance and account balances
+      const newOutstanding = newTotal - newPaid;
+      if (finalSupplierId && newOutstanding !== 0) {
+        await updateSupplierBalance(businessId, finalSupplierId, Math.abs(newOutstanding), newOutstanding > 0 ? 'increment' : 'decrement');
       }
 
-      // 7. Apply new account balance update and record payment (Payment reduces debt)
-      if (Number(amount_paid) > 0 && effectiveNewSupplierId) {
+      if (newPaid > 0) {
         if (payment_mode === 'both') {
           const cash = Number(cash_amount) || 0;
           const upi = Number(upi_amount) || 0;
-
+          
           if (cash > 0) {
             await supabase.from('supplier_payments').insert([{
-              business_id: businessId,
-              supplier_id: effectiveNewSupplierId,
-              purchase_id: Number(id),
-              amount: cash,
-              payment_mode: 'cash',
-              payment_date: purchase_date || new Date().toISOString(),
-              notes: `Updated initial payment at purchase (Cash Part)`
+              business_id: businessId, supplier_id: finalSupplierId, purchase_id: Number(id),
+              amount: cash, payment_mode: 'cash', payment_date: purchase_date || new Date().toISOString(),
+              notes: `Linked to Purchase #${purchase_number} (Edit)`
             }]);
             await updateAccountBalance(businessId, 'cash', cash, 'decrement');
-            await updateSupplierBalance(businessId, effectiveNewSupplierId, cash, 'decrement');
           }
-
           if (upi > 0) {
             await supabase.from('supplier_payments').insert([{
-              business_id: businessId,
-              supplier_id: effectiveNewSupplierId,
-              purchase_id: Number(id),
-              amount: upi,
-              payment_mode: 'upi',
-              payment_date: purchase_date || new Date().toISOString(),
-              notes: `Updated initial payment at purchase (UPI Part)`
+              business_id: businessId, supplier_id: finalSupplierId, purchase_id: Number(id),
+              amount: upi, payment_mode: 'upi', payment_date: purchase_date || new Date().toISOString(),
+              notes: `Linked to Purchase #${purchase_number} (Edit)`
             }]);
             await updateAccountBalance(businessId, 'upi', upi, 'decrement');
-            await updateSupplierBalance(businessId, effectiveNewSupplierId, upi, 'decrement');
           }
-        } else if (payment_mode) {
+        } else {
           await supabase.from('supplier_payments').insert([{
-            business_id: businessId,
-            supplier_id: effectiveNewSupplierId,
-            purchase_id: Number(id),
-            amount: Number(amount_paid),
-            payment_mode,
-            payment_date: purchase_date || new Date().toISOString(),
-            notes: `Updated initial payment at purchase`
+            business_id: businessId, supplier_id: finalSupplierId, purchase_id: Number(id),
+            amount: newPaid, payment_mode: payment_mode as string, payment_date: purchase_date || new Date().toISOString(),
+            notes: `Linked to Purchase #${purchase_number} (Edit)`
           }]);
-          await updateAccountBalance(businessId, payment_mode, Number(amount_paid), 'decrement');
-          await updateSupplierBalance(businessId, effectiveNewSupplierId, Number(amount_paid), 'decrement');
+          await updateAccountBalance(businessId, payment_mode as string, newPaid, 'decrement');
         }
       }
 
@@ -2417,16 +2654,19 @@ async function startServer() {
 
     try {
       // 1. Get payment details
-      const { data: payment, error: pError } = await supabase
+      const { data: payResults, error: pError } = await supabase
         .from('payments')
         .select(`
           *,
           customers (business_id)
         `)
         .eq('id', id)
-        .single();
+        .limit(1);
 
-      if (pError || !payment) throw new Error("Payment not found or unauthorized");
+      if (pError || !payResults || payResults.length === 0) {
+        throw new Error("Payment not found or unauthorized");
+      }
+      const payment = payResults[0];
 
       // 2. Reverse account balance
       await updateAccountBalance(businessId, payment.payment_mode, payment.amount, 'decrement');
@@ -2438,7 +2678,13 @@ async function startServer() {
 
       // 4. If linked to an invoice, reverse invoice status
       if (payment.invoice_id) {
-        const { data: invoice } = await supabase.from('invoices').select('total_amount').eq('id', payment.invoice_id).single();
+        const { data: invResults } = await supabase
+          .from('invoices')
+          .select('total_amount')
+          .eq('id', payment.invoice_id)
+          .limit(1);
+        
+        const invoice = invResults?.[0];
         
         if (invoice) {
           const { data: otherPayments } = await supabase.from('payments').select('amount').eq('invoice_id', payment.invoice_id).neq('id', id);
@@ -2471,16 +2717,19 @@ async function startServer() {
 
     try {
       // 1. Get old payment details
-      const { data: oldPayment, error: pError } = await supabase
+      const { data: payResults, error: pError } = await supabase
         .from('payments')
         .select(`
           *,
           customers (business_id)
         `)
         .eq('id', id)
-        .single();
+        .limit(1);
 
-      if (pError || !oldPayment) throw new Error("Payment not found or unauthorized");
+      if (pError || !payResults || payResults.length === 0) {
+        throw new Error("Payment not found or unauthorized");
+      }
+      const oldPayment = payResults[0];
 
       // 2. Reverse old values
       await updateAccountBalance(businessId, oldPayment.payment_mode, oldPayment.amount, 'decrement');
@@ -2500,7 +2749,12 @@ async function startServer() {
 
       // 5. If linked to an invoice, update invoice status
       if (oldPayment.invoice_id) {
-        const { data: invoice } = await supabase.from('invoices').select('total_amount').eq('id', oldPayment.invoice_id).single();
+        const { data: invResults } = await supabase
+          .from('invoices')
+          .select('total_amount')
+          .eq('id', oldPayment.invoice_id)
+          .limit(1);
+        const invoice = invResults?.[0];
         if (invoice) {
           const { data: payments } = await supabase.from('payments').select('amount').eq('invoice_id', oldPayment.invoice_id);
           const totalPaid = payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
@@ -2771,7 +3025,7 @@ async function startServer() {
 
       // Helper to record a supplier payment and update account balance
       const recordPayment = async (amt: number, mode: string, purchId?: number, customNotes?: string) => {
-        const { data: payment, error: pError } = await supabase
+        const { data, error: pError } = await supabase
           .from('supplier_payments')
           .insert([{
             business_id: req.businessId,
@@ -2784,10 +3038,10 @@ async function startServer() {
             payment_date: payment_date || new Date().toISOString(),
             notes: customNotes || notes
           }])
-          .select()
-          .single();
+          .select();
         
-        if (pError) throw pError;
+        if (pError || !data || data.length === 0) throw pError || new Error("Failed to record supplier payment");
+        const payment = data[0];
         
         // Update Account Balance (Decrement because it's a PAY OUT)
         await updateAccountBalance(req.businessId, mode, amt, 'decrement');
@@ -2826,20 +3080,28 @@ async function startServer() {
           }
 
           // Update purchase status
-          const { data: purchase } = await supabase.from('purchases').select('total_amount').eq('id', purchase_id).single();
-          const { data: payments } = await supabase.from('supplier_payments').select('amount').eq('purchase_id', purchase_id);
-          const paidSoFar = payments?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) || 0;
+          const { data: purResults } = await supabase.from('purchases').select('total_amount').eq('id', purchase_id).limit(1);
+          const purchase = purResults?.[0];
           
-          let status = 'unpaid';
-          if (paidSoFar > 0) {
-            status = paidSoFar >= Number(purchase.total_amount) ? 'paid' : 'partial';
+          if (purchase) {
+            const { data: payments } = await supabase.from('supplier_payments').select('amount, cash_amount, upi_amount').eq('purchase_id', purchase_id);
+            const paidSoFar = payments?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) || 0;
+            const cashSoFar = payments?.reduce((sum: number, p: any) => sum + (Number(p.cash_amount) || 0), 0) || 0;
+            const upiSoFar = payments?.reduce((sum: number, p: any) => sum + (Number(p.upi_amount) || 0), 0) || 0;
+            
+            let status = 'unpaid';
+            if (paidSoFar > 0) {
+              status = paidSoFar >= Number(purchase.total_amount) ? 'paid' : 'partial';
+            }
+            
+            await supabase.from('purchases').update({ 
+              payment_status: status,
+              amount_paid: paidSoFar,
+              cash_amount: cashSoFar,
+              upi_amount: upiSoFar,
+              balance_due: Math.max(0, Number(purchase.total_amount) - paidSoFar)
+            }).eq('id', purchase_id);
           }
-          
-          await supabase.from('purchases').update({ 
-            payment_status: status,
-            amount_paid: paidSoFar,
-            balance_due: Math.max(0, Number(purchase.total_amount) - paidSoFar)
-          }).eq('id', purchase_id);
         }
       }
 
@@ -2918,7 +3180,15 @@ async function startServer() {
     const monthEnd = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00+05:30`;
 
     try {
-      // 1. Sales (Money in from customers - payments table)
+      // 1. Invoices (Total Generated Invoices - total invoiced)
+      const { data: invoices } = await supabase
+        .from('invoices')
+        .select('total_amount')
+        .eq('business_id', req.businessId)
+        .gte('created_at', monthStart)
+        .lt('created_at', monthEnd);
+
+      // 2. Sales (Money in from customers - payments table - total collection)
       const { data: sales } = await supabase
         .from('payments')
         .select('amount, payment_mode')
@@ -2926,42 +3196,59 @@ async function startServer() {
         .gte('payment_date', monthStart)
         .lt('payment_date', monthEnd);
 
-      // 2. Goods (Money out to suppliers - supplier_payments table)
-      const { data: supplierPayments } = await supabase
-        .from('supplier_payments')
-        .select('amount, payment_mode')
+      // 3. Purchases (Total Generated Purchases - total purchased)
+      const { data: purchases } = await supabase
+        .from('purchases')
+        .select('total_amount, payment_mode, cash_amount, upi_amount')
         .eq('business_id', req.businessId)
-        .gte('payment_date', monthStart)
-        .lt('payment_date', monthEnd);
+        .gte('purchase_date', monthStart)
+        .lt('purchase_date', monthEnd);
 
-      // 3. Expenses (Money out for other things - expenses table)
+      // 4. Expenses (Money out for other things - expenses table)
       const { data: expenses } = await supabase
         .from('expenses')
-        .select('amount, payment_mode')
+        .select('amount, payment_mode, cash_amount, upi_amount')
         .eq('business_id', req.businessId)
         .gte('expense_date', monthStart)
         .lt('expense_date', monthEnd);
 
       const summary = {
+        total_invoiced: 0,
+        total_collection: 0,
+        total_purchased: 0,
         sales: { cash: 0, upi: 0 },
         goods: { cash: 0, upi: 0 },
         expenses: { cash: 0, upi: 0 },
         stillHave: { cash: 0, upi: 0 }
       };
 
-      sales?.forEach((s: any) => {
-        if (s.payment_mode === 'cash') summary.sales.cash += (s.amount || 0);
-        else if (s.payment_mode === 'upi') summary.sales.upi += (s.amount || 0);
+      invoices?.forEach((inv: any) => {
+        summary.total_invoiced += (inv.total_amount || 0);
       });
 
-      supplierPayments?.forEach((p: any) => {
-        if (p.payment_mode === 'cash') summary.goods.cash += (p.amount || 0);
-        else if (p.payment_mode === 'upi') summary.goods.upi += (p.amount || 0);
+      purchases?.forEach((p: any) => {
+        summary.total_purchased += (p.total_amount || 0);
+        if (p.payment_mode === 'cash') summary.goods.cash += (p.amount_paid || 0);
+        else if (p.payment_mode === 'upi') summary.goods.upi += (p.amount_paid || 0);
+        else if (p.payment_mode === 'both') {
+          summary.goods.cash += (p.cash_amount || 0);
+          summary.goods.upi += (p.upi_amount || 0);
+        }
+      });
+
+      sales?.forEach((s: any) => {
+        summary.total_collection += (s.amount || 0);
+        if (s.payment_mode === 'cash') summary.sales.cash += (s.amount || 0);
+        else if (s.payment_mode === 'upi') summary.sales.upi += (s.amount || 0);
       });
 
       expenses?.forEach((e: any) => {
         if (e.payment_mode === 'cash') summary.expenses.cash += (e.amount || 0);
         else if (e.payment_mode === 'upi') summary.expenses.upi += (e.amount || 0);
+        else if (e.payment_mode === 'both') {
+          summary.expenses.cash += (e.cash_amount || 0);
+          summary.expenses.upi += (e.upi_amount || 0);
+        }
       });
 
       summary.stillHave.cash = summary.sales.cash - summary.goods.cash - summary.expenses.cash;
@@ -3168,6 +3455,30 @@ async function startServer() {
   });
 
   // Reports
+  app.get("/api/suppliers/payments", async (req: any, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('supplier_payments')
+        .select(`
+          *,
+          suppliers (name)
+        `)
+        .eq('business_id', req.businessId)
+        .order('payment_date', { ascending: false });
+      
+      if (error) throw error;
+      
+      const formattedData = data?.map(p => ({
+        ...p,
+        supplier_name: (p as any).suppliers?.name || 'Unknown Supplier'
+      }));
+
+      res.json(formattedData);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/reports/sales", async (req: any, res) => {
     const { month } = req.query;
     if (!month) return res.status(400).json({ error: "Month is required" });
@@ -3301,7 +3612,7 @@ async function startServer() {
       const nextMonthStr = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}`;
       const monthEnd = `${nextMonthStr}-01T00:00:00+05:30`;
 
-      const { data: payments, error } = await supabase
+      const { data: payments, error: pError } = await supabase
         .from('payments')
         .select(`
           id, amount, payment_date, payment_mode,
@@ -3312,9 +3623,54 @@ async function startServer() {
         .gte('payment_date', monthStart)
         .lt('payment_date', monthEnd);
       
-      if (error) throw error;
+      if (pError) throw pError;
 
-      const formatted = payments?.map((p: any) => ({
+      const { data: invoices, error: invError } = await supabase
+        .from('invoices')
+        .select(`
+          id, total_amount, created_at, invoice_number,
+          customers (name)
+        `)
+        .eq('business_id', req.businessId)
+        .gte('created_at', monthStart)
+        .lt('created_at', monthEnd);
+
+      if (invError) throw invError;
+
+      const { data: supplierPayments, error: spError } = await supabase
+        .from('supplier_payments')
+        .select(`
+          id, amount, payment_date, payment_mode,
+          suppliers (name),
+          purchases (purchase_number)
+        `)
+        .eq('business_id', req.businessId)
+        .gte('payment_date', monthStart)
+        .lt('payment_date', monthEnd);
+
+      if (spError) throw spError;
+
+      const { data: purchases, error: purError } = await supabase
+        .from('purchases')
+        .select(`
+          id, total_amount, purchase_date, purchase_number, supplier_name
+        `)
+        .eq('business_id', req.businessId)
+        .gte('purchase_date', monthStart)
+        .lt('purchase_date', monthEnd);
+
+      if (purError) throw purError;
+
+      const { data: expenses, error: eError } = await supabase
+        .from('expenses')
+        .select('id, amount, expense_date, payment_mode, category, description')
+        .eq('business_id', req.businessId)
+        .gte('expense_date', monthStart)
+        .lt('expense_date', monthEnd);
+
+      if (eError) throw eError;
+
+      const formattedPayments = payments?.map((p: any) => ({
         type: 'payment',
         id: p.id,
         reference: p.invoices?.invoice_number || 'Direct',
@@ -3322,7 +3678,50 @@ async function startServer() {
         amount: p.amount,
         date: getISTDate(p.payment_date),
         status: p.payment_mode
-      })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      })) || [];
+
+      const formattedInvoices = invoices?.map((inv: any) => ({
+        type: 'invoice',
+        id: inv.id,
+        reference: inv.invoice_number,
+        customer_name: inv.customers?.name || 'General / Walk-in',
+        amount: inv.total_amount,
+        date: getISTDate(inv.created_at),
+        status: 'invoiced'
+      })) || [];
+
+      const formattedGoods = supplierPayments?.map((p: any) => ({
+        type: 'goods',
+        id: p.id,
+        reference: p.purchases?.purchase_number || 'Direct',
+        customer_name: p.suppliers?.name || 'Bulk Purchase',
+        amount: -p.amount,
+        date: getISTDate(p.payment_date),
+        status: p.payment_mode
+      })) || [];
+
+      const formattedPurchases = purchases?.map((pur: any) => ({
+        type: 'purchase_record',
+        id: pur.id,
+        reference: pur.purchase_number,
+        customer_name: pur.supplier_name,
+        amount: -pur.total_amount,
+        date: getISTDate(pur.purchase_date),
+        status: 'purchased'
+      })) || [];
+
+      const formattedExpenses = expenses?.map((e: any) => ({
+        type: 'expense',
+        id: e.id,
+        reference: e.category,
+        customer_name: e.description || e.category,
+        amount: -e.amount,
+        date: getISTDate(e.expense_date),
+        status: e.payment_mode
+      })) || [];
+
+      const formatted = [...formattedPayments, ...formattedInvoices, ...formattedGoods, ...formattedPurchases, ...formattedExpenses]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       res.json(formatted);
     } catch (error: any) {
@@ -3336,7 +3735,7 @@ async function startServer() {
     try {
       const { data, error } = await supabase
         .from('expenses')
-        .select('id, business_id, category, description, amount, payment_mode, expense_date')
+        .select('id, business_id, category, description, amount, payment_mode, expense_date, cash_amount, upi_amount')
         .eq('business_id', req.businessId)
         .order('expense_date', { ascending: false });
       
@@ -3369,10 +3768,12 @@ async function startServer() {
           category,
           description,
           amount,
+          cash_amount: Number(cash_amount) || 0,
+          upi_amount: Number(upi_amount) || 0,
           payment_mode,
           expense_date: expense_date || new Date().toISOString()
         }])
-        .select('id, business_id, category, description, amount, payment_mode, expense_date')
+        .select('id, business_id, category, description, amount, payment_mode, expense_date, cash_amount, upi_amount')
         .single();
       
       if (error) throw error;
@@ -3971,9 +4372,9 @@ async function startServer() {
   } else if (!process.env.VERCEL) {
     // Only serve static files manually if NOT on Vercel
     // Vercel handles static files via vercel.json rewrites
-    app.use(express.static(path.join(__dirname, "../dist")));
+    app.use(express.static(path.join(_dirname, "../dist")));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(__dirname, "../dist", "index.html"));
+      res.sendFile(path.join(_dirname, "../dist", "index.html"));
     });
   }
 

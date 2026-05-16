@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, ShoppingBag, Calendar, CreditCard, X, Eye, FileText, List, Receipt, Trash2, ChevronLeft, Edit3, Box, Banknote, Smartphone, Calculator, ChevronRight, ArrowLeft, Download, Printer } from 'lucide-react';
+import { Plus, Search, ShoppingBag, Calendar, CreditCard, X, Eye, FileText, List, Receipt, Trash2, ChevronLeft, Edit3, Box, Banknote, Smartphone, Calculator, ChevronRight, ArrowLeft, Download, Printer, PieChart } from 'lucide-react';
 import { Purchase, Product, Expense, Customer } from '../types';
 import { formatCurrency, formatDate, cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -35,14 +35,22 @@ export default function Purchases() {
     staleTime: 1000 * 30, // 30 seconds
   });
 
-  const loading = purchasesLoading || expensesLoading || productsLoading || suppliersLoading;
+  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
+    queryKey: ['supplier-payments'],
+    queryFn: () => supabaseService.getSupplierPayments(),
+    staleTime: 1000 * 30,
+  });
+
+  const loading = purchasesLoading || expensesLoading || productsLoading || suppliersLoading || paymentsLoading;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'records' | 'expenses'>('records');
+  const [activeTab, setActiveTab] = useState<'records' | 'expenses' | 'total'>('records');
+  const [selectedMonth, setSelectedMonth] = useState<string | 'all'>(new Date().toISOString().slice(0, 7));
   const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isItemSelectorOpen, setIsItemSelectorOpen] = useState(false);
+  const [purchaseSearchTerm, setPurchaseSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'partial' | 'unpaid'>('all');
 
   // Delete Confirmation State
@@ -510,41 +518,105 @@ export default function Purchases() {
               Expenses
             </span>
           </button>
+          <button 
+            onClick={() => setActiveTab('total')}
+            className={cn(
+              "flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold transition-all relative z-10 text-xs",
+              activeTab === 'total' 
+                ? "text-indigo-600" 
+                : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+            )}
+          >
+            {activeTab === 'total' && (
+              <motion.div 
+                layoutId="activeTab"
+                className="absolute inset-0 bg-white dark:bg-slate-900 rounded-lg shadow-sm"
+                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+              />
+            )}
+            <span className="relative z-20 flex items-center gap-2">
+              <PieChart size={14} />
+              Total Purchase
+            </span>
+          </button>
         </div>
       </div>
 
+      {activeTab === 'total' && (
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-3 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 w-fit">
+            <Calendar size={18} className="text-slate-400" />
+            {selectedMonth === 'all' ? (
+              <span className="font-bold text-slate-900 dark:text-white text-sm px-2">All Time Statistics</span>
+            ) : (
+              <input 
+                type="month" 
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="bg-transparent border-none outline-none font-bold text-slate-900 dark:text-white text-sm"
+              />
+            )}
+          </div>
+          
+          <button
+            onClick={() => setSelectedMonth(selectedMonth === 'all' ? new Date().toISOString().slice(0, 7) : 'all')}
+            className={cn(
+              "px-4 py-3 rounded-2xl font-bold text-xs transition-all border",
+              selectedMonth === 'all' 
+                ? "bg-slate-900 text-white border-slate-900" 
+                : "bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-200 dark:border-slate-800"
+            )}
+          >
+            {selectedMonth === 'all' ? 'Specific Month' : 'All Time Stats'}
+          </button>
+        </div>
+      )}
+
       {/* Filter Bar */}
       {activeTab === 'records' && (
-        <div className="flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit overflow-x-auto custom-scrollbar scroll-smooth relative">
-          <div className="flex min-w-max">
-            {[
-              { id: 'all', label: 'All Purchases' },
-              { id: 'paid', label: 'Paid' },
-              { id: 'partial', label: 'Partial' },
-              { id: 'unpaid', label: 'Pending' }
-            ].map((status) => (
-              <button
-                key={status.id}
-                onClick={() => setFilterStatus(status.id as any)}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold transition-all relative z-10 text-xs",
-                  filterStatus === status.id 
-                    ? "text-indigo-600" 
-                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                )}
-              >
-                {filterStatus === status.id && (
-                  <motion.div 
-                    layoutId="purchaseFilter"
-                    className="absolute inset-0 bg-white dark:bg-slate-900 rounded-lg shadow-sm"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                  />
-                )}
-                <span className="relative z-20 whitespace-nowrap">
-                  {status.label}
-                </span>
-              </button>
-            ))}
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div className="flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit overflow-x-auto custom-scrollbar scroll-smooth relative">
+            <div className="flex min-w-max">
+              {[
+                { id: 'all', label: 'All Purchases' },
+                { id: 'paid', label: 'Paid' },
+                { id: 'partial', label: 'Partial' },
+                { id: 'unpaid', label: 'Pending' }
+              ].map((status) => (
+                <button
+                  key={status.id}
+                  onClick={() => setFilterStatus(status.id as any)}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold transition-all relative z-10 text-xs",
+                    filterStatus === status.id 
+                      ? "text-indigo-600" 
+                      : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                  )}
+                >
+                  {filterStatus === status.id && (
+                    <motion.div 
+                      layoutId="purchaseFilter"
+                      className="absolute inset-0 bg-white dark:bg-slate-900 rounded-lg shadow-sm"
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+                  <span className="relative z-20 whitespace-nowrap">
+                    {status.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="relative w-full md:w-64">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text"
+              placeholder="Search by ID or Supplier..."
+              value={purchaseSearchTerm}
+              onChange={(e) => setPurchaseSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs font-bold"
+            />
           </div>
         </div>
       )}
@@ -581,6 +653,12 @@ export default function Purchases() {
                     <AnimatePresence mode="popLayout">
                       {purchases
                         .filter(p => filterStatus === 'all' || p.payment_status === filterStatus)
+                        .filter(p => {
+                          const search = purchaseSearchTerm.toLowerCase();
+                          return (p.supplier_name || '').toLowerCase().includes(search) || 
+                                 (p.purchase_number || '').toLowerCase().includes(search) ||
+                                 (p.id?.toString() || '').includes(search);
+                        })
                         .map((purchase, index) => (
                         <motion.tr 
                           key={purchase.id}
@@ -662,7 +740,7 @@ export default function Purchases() {
               </table>
             </div>
           </motion.div>
-        ) : (
+        ) : activeTab === 'expenses' ? (
           <motion.div 
             key="expenses"
             initial={{ opacity: 0, y: 10 }}
@@ -728,6 +806,310 @@ export default function Purchases() {
                 ))}
               </AnimatePresence>
             )}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="total-summary"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="space-y-6"
+          >
+            {(() => {
+              const monthlyPurchases = selectedMonth === 'all' 
+                ? purchases 
+                : purchases.filter(p => p.purchase_date && p.purchase_date.startsWith(selectedMonth));
+              
+              // 1. Invoice-centric calculation
+              const totalPurchaseAmount = monthlyPurchases.reduce((acc, p) => acc + (p.total_amount || 0), 0);
+              const pendingAmountInInvoices = monthlyPurchases.reduce((acc, p) => acc + (p.balance_due || 0), 0);
+              
+              // Use cash_amount/upi_amount from the purchases table which represents total paid FOR THESE INVOICES
+              const cashInInvoices = monthlyPurchases.reduce((acc, p) => {
+                const invoiceCash = Number(p.cash_amount) || 0;
+                const invoiceUpi = Number(p.upi_amount) || 0;
+                
+                // If specific split amounts are recorded, use them
+                if (invoiceCash > 0 || invoiceUpi > 0) {
+                  return acc + invoiceCash;
+                }
+                
+                // Fallback for older records using payment_mode
+                if (p.payment_mode === 'cash') return acc + (Number(p.amount_paid) || 0);
+                if (p.payment_mode === 'both') return acc + (Number(p.amount_paid) || 0) / 2; // Rough estimate for old dual payments if split missing
+                return acc;
+              }, 0);
+
+              const upiInInvoices = monthlyPurchases.reduce((acc, p) => {
+                const invoiceCash = Number(p.cash_amount) || 0;
+                const invoiceUpi = Number(p.upi_amount) || 0;
+                
+                if (invoiceCash > 0 || invoiceUpi > 0) {
+                  return acc + invoiceUpi;
+                }
+                
+                if (p.payment_mode === 'upi') return acc + (Number(p.amount_paid) || 0);
+                if (p.payment_mode === 'both') return acc + (Number(p.amount_paid) || 0) / 2;
+                return acc;
+              }, 0);
+
+              // 2. Cash Flow centric (All money that LEFT the business)
+              const supplierPayments = Array.isArray(payments) ? (
+                selectedMonth === 'all' 
+                ? payments 
+                : payments.filter((p: any) => p.payment_date && p.payment_date.startsWith(selectedMonth))
+              ) : [];
+
+              const totalCashOut = supplierPayments.reduce((acc: number, p: any) => 
+                acc + (p.payment_mode === 'cash' ? (p.amount || 0) : (p.cash_amount || 0)), 0);
+              const totalUpiOut = supplierPayments.reduce((acc: number, p: any) => 
+                acc + (p.payment_mode === 'upi' ? (p.amount || 0) : (p.upi_amount || 0)), 0);
+
+              // Identify if there's a discrepancy (e.g. paying old debt)
+              const oldDebtPayments = Math.max(0, (totalCashOut + totalUpiOut) - (cashInInvoices + upiInInvoices));
+
+              return (
+                <>
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-20 transition-opacity">
+                        <ShoppingBag size={80} />
+                      </div>
+                      <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl flex items-center justify-center text-indigo-600 mb-4">
+                        <ShoppingBag size={20} />
+                      </div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Purchases</p>
+                      <h4 className="text-2xl font-black text-slate-900 dark:text-white">{formatCurrency(totalPurchaseAmount)}</h4>
+                      <p className="text-[10px] text-slate-500 font-bold mt-2">{monthlyPurchases.length} invoices recorded {selectedMonth === 'all' ? 'All Time' : `in ${selectedMonth}`}</p>
+                    </div>
+
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-20 transition-opacity text-emerald-600">
+                        <Banknote size={80} />
+                      </div>
+                      <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl flex items-center justify-center text-emerald-600 mb-4">
+                        <Banknote size={20} />
+                      </div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Paid (Cash)</p>
+                      <h4 className="text-2xl font-black text-emerald-600">{formatCurrency(cashInInvoices)}</h4>
+                      <p className="text-[10px] text-slate-500 font-bold mt-2">Cash settlement for invoices</p>
+                    </div>
+
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-20 transition-opacity text-blue-600">
+                        <Smartphone size={80} />
+                      </div>
+                      <div className="w-10 h-10 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center text-blue-600 mb-4">
+                        <Smartphone size={20} />
+                      </div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Paid (UPI)</p>
+                      <h4 className="text-2xl font-black text-blue-600">{formatCurrency(upiInInvoices)}</h4>
+                      <p className="text-[10px] text-slate-500 font-bold mt-2">UPI settlement for invoices</p>
+                    </div>
+
+                    <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-rose-50 dark:bg-rose-900/10 p-6 rounded-[2.5rem] border border-rose-100 dark:border-rose-900/30 shadow-sm relative group">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-rose-100 dark:bg-rose-900/30 rounded-[1.25rem] flex items-center justify-center text-rose-600">
+                            <CreditCard size={24} />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-1">Total Balance Due</p>
+                            <h4 className="text-2xl font-black text-rose-600">{formatCurrency(pendingAmountInInvoices)}</h4>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-indigo-50 dark:bg-indigo-900/10 p-6 rounded-[2.5rem] border border-indigo-100 dark:border-indigo-900/30 shadow-sm relative group">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-[1.25rem] flex items-center justify-center text-indigo-600">
+                            <Receipt size={24} />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Total Paid (Overall)</p>
+                            <h4 className="text-2xl font-black text-indigo-600">{formatCurrency(cashInInvoices + upiInInvoices)}</h4>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {oldDebtPayments > 0 && (
+                    <motion.div 
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 p-4 rounded-3xl flex items-center gap-4"
+                    >
+                      <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center text-amber-600">
+                        <Receipt size={20} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-amber-900 dark:text-amber-400">Previous Debt Clearance</p>
+                        <p className="text-[10px] font-bold text-amber-700/70 dark:text-amber-500/70">
+                          In addition to new purchases, you paid <span className="font-black">{formatCurrency(oldDebtPayments)}</span> towards previous outstanding balances this month.
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Payment Distribution Chart-like visualization */}
+                  <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <div className="flex items-center justify-between mb-8">
+                      <div>
+                        <h4 className="text-lg font-black text-slate-900 dark:text-white">Payment Distribution (Current Month Invoices)</h4>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">How {formatCurrency(totalPurchaseAmount)} is split</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Settled</p>
+                        <p className="text-xl font-black text-slate-900 dark:text-white">{formatCurrency(cashInInvoices + upiInInvoices)}</p>
+                      </div>
+                    </div>
+
+                    <div className="relative h-8 bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden flex shadow-inner">
+                      {totalPurchaseAmount > 0 ? (
+                        <>
+                          <div 
+                            className="h-full bg-emerald-500 transition-all duration-500 relative group"
+                            style={{ width: `${(cashInInvoices / totalPurchaseAmount) * 100}%` }}
+                          >
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap px-2 pointer-events-none">
+                              <span className="text-[10px] font-black text-white bg-slate-900/80 px-2 py-1 rounded shadow-lg translate-y-[-30px]">Cash: {Math.round((cashInInvoices / totalPurchaseAmount) * 100)}%</span>
+                            </div>
+                          </div>
+                          <div 
+                            className="h-full bg-blue-500 transition-all duration-500 relative group border-l border-white/20 dark:border-black/20"
+                            style={{ width: `${(upiInInvoices / totalPurchaseAmount) * 100}%` }}
+                          >
+                             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap px-2 pointer-events-none">
+                              <span className="text-[10px] font-black text-white bg-slate-900/80 px-2 py-1 rounded shadow-lg translate-y-[-30px]">UPI: {Math.round((upiInInvoices / totalPurchaseAmount) * 100)}%</span>
+                            </div>
+                          </div>
+                          <div 
+                            className="h-full bg-rose-500 transition-all duration-500 relative group border-l border-white/20 dark:border-black/20"
+                            style={{ width: `${(pendingAmountInInvoices / totalPurchaseAmount) * 100}%` }}
+                          >
+                             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap px-2 pointer-events-none">
+                              <span className="text-[10px] font-black text-white bg-slate-900/80 px-2 py-1 rounded shadow-lg translate-y-[-30px]">Pending: {Math.round((pendingAmountInInvoices / totalPurchaseAmount) * 100)}%</span>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="w-full flex items-center justify-center italic text-slate-400 text-[10px] font-bold">No purchase data for this month</div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-8 mt-8">
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 bg-emerald-500 rounded-full" />
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Cash</p>
+                          <p className="text-sm font-black text-slate-900 dark:text-white">{formatCurrency(cashInInvoices)}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 bg-blue-500 rounded-full" />
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">UPI</p>
+                          <p className="text-sm font-black text-slate-900 dark:text-white">{formatCurrency(upiInInvoices)}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 bg-rose-500 rounded-full" />
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Pending</p>
+                          <p className="text-sm font-black text-slate-900 dark:text-white">{formatCurrency(pendingAmountInInvoices)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* List of top suppliers for the month */}
+                  <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
+                      <h5 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Suppliers Activity ({selectedMonth})</h5>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 dark:bg-slate-800/30">
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Supplier Name</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Invoices</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total Purchased</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Cash Paid</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">UPI Paid</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Balance Due</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {(() => {
+                            const supplierStats: any = {};
+                            monthlyPurchases.forEach(p => {
+                              const name = p.supplier_name;
+                              if (!supplierStats[name]) {
+                                supplierStats[name] = { count: 0, total: 0, due: 0, paid: 0, cash: 0, upi: 0 };
+                              }
+                              supplierStats[name].count += 1;
+                              supplierStats[name].total += (p.total_amount || 0);
+                              supplierStats[name].due += (p.balance_due || 0);
+                              supplierStats[name].paid += (Number(p.amount_paid) || 0);
+                              
+                              const c = Number(p.cash_amount) || 0;
+                              const u = Number(p.upi_amount) || 0;
+                              if (c > 0 || u > 0) {
+                                supplierStats[name].cash += c;
+                                supplierStats[name].upi += u;
+                              } else {
+                                if (p.payment_mode === 'cash') supplierStats[name].cash += (Number(p.amount_paid) || 0);
+                                else if (p.payment_mode === 'upi') supplierStats[name].upi += (Number(p.amount_paid) || 0);
+                                else if (p.payment_mode === 'both') {
+                                  supplierStats[name].cash += (Number(p.amount_paid) || 0) / 2;
+                                  supplierStats[name].upi += (Number(p.amount_paid) || 0) / 2;
+                                }
+                              }
+                            });
+
+                            const sortedSuppliers = Object.keys(supplierStats).sort((a, b) => supplierStats[b].total - supplierStats[a].total);
+
+                            if (sortedSuppliers.length === 0) {
+                              return <tr><td colSpan={6} className="px-6 py-10 text-center text-slate-400 italic">No activity for this month</td></tr>;
+                            }
+
+                            return sortedSuppliers.map(name => (
+                              <tr key={name} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                                <td className="px-6 py-4">
+                                  <span className="text-xs font-black text-slate-900 dark:text-white line-clamp-1">{name}</span>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{supplierStats[name].count}</span>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <span className="text-xs font-black text-slate-900 dark:text-white">{formatCurrency(supplierStats[name].total)}</span>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <span className="text-xs font-black text-emerald-600">{formatCurrency(supplierStats[name].cash)}</span>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <span className="text-xs font-black text-blue-600">{formatCurrency(supplierStats[name].upi)}</span>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <span className={cn(
+                                    "text-xs font-black",
+                                    supplierStats[name].due > 0 ? "text-rose-600" : "text-slate-400"
+                                  )}>
+                                    {formatCurrency(supplierStats[name].due)}
+                                  </span>
+                                </td>
+                              </tr>
+                            ));
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </motion.div>
         )}
       </AnimatePresence>

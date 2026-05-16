@@ -20,7 +20,7 @@ export default function DailySalesDetail() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'payment' | 'invoice'>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'payment' | 'invoice' | 'goods' | 'purchase_record' | 'expense'>('all');
   const month = searchParams.get('month') || new Date().toISOString().slice(0, 7);
 
   const { data: rawData = [], isLoading: loading } = useQuery({
@@ -42,14 +42,16 @@ export default function DailySalesDetail() {
     return matchesSearch && matchesType;
   });
 
-  const totalAmount = filteredData.reduce((acc, item) => acc + item.amount, 0);
+  const totalIn = filteredData.filter(i => i.amount > 0).reduce((acc, item) => acc + item.amount, 0);
+  const totalOut = Math.abs(filteredData.filter(i => i.amount < 0).reduce((acc, item) => acc + item.amount, 0));
+  const netAmount = totalIn - totalOut;
 
   const exportToPDF = () => {
     const doc = new jsPDF();
     
     doc.setFontSize(20);
     doc.setTextColor(79, 70, 229);
-    doc.text('Daily Sales Detailed Report', 14, 22);
+    doc.text('Monthly Financial Detailed Report', 14, 22);
     
     doc.setFontSize(10);
     doc.setTextColor(100);
@@ -62,12 +64,12 @@ export default function DailySalesDetail() {
       tx.customer_name,
       tx.reference,
       tx.amount.toFixed(2),
-      tx.status.toUpperCase()
+      tx.status?.toUpperCase() || ''
     ]);
     
     autoTable(doc, {
       startY: 50,
-      head: [['Date', 'Type', 'Customer', 'Reference', 'Amount (INR)', 'Status/Mode']],
+      head: [['Date', 'Type', 'Customer/Ref', 'Reference', 'Amount (INR)', 'Status/Mode']],
       body: tableData,
       theme: 'striped',
       headStyles: { fillColor: [79, 70, 229] },
@@ -77,7 +79,7 @@ export default function DailySalesDetail() {
       }
     });
     
-    doc.save(`Daily_Sales_Detail_${month}.pdf`);
+    doc.save(`Financial_Detail_${month}.pdf`);
   };
 
   return (
@@ -91,7 +93,7 @@ export default function DailySalesDetail() {
             <ArrowLeft size={24} className="text-slate-600 dark:text-slate-400" />
           </button>
           <div>
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white">Daily Sales Breakdown</h2>
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white">Monthly Breakdown</h2>
             <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Detailed Transaction Ledger</p>
           </div>
         </div>
@@ -116,40 +118,53 @@ export default function DailySalesDetail() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-center">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Amount</p>
-          <h4 className="text-2xl font-black text-indigo-600">{formatCurrency(totalAmount)}</h4>
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-center">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total In</p>
+          <h4 className="text-xl font-black text-emerald-600">{formatCurrency(totalIn)}</h4>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-center">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Out</p>
+          <h4 className="text-xl font-black text-rose-600">{formatCurrency(totalOut)}</h4>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-center">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Net Cash Flow</p>
+          <h4 className={cn(
+            "text-xl font-black",
+            netAmount >= 0 ? "text-indigo-600" : "text-rose-600"
+          )}>{formatCurrency(netAmount)}</h4>
         </div>
         
-        <div className="md:col-span-2 bg-white dark:bg-slate-900 p-2 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-2">
+        <div className="bg-white dark:bg-slate-900 p-2 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center">
           <div className="flex-1 relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input 
               type="text" 
-              placeholder="Search by customer or reference..."
+              placeholder="Search..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border-none rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
             />
           </div>
         </div>
+      </div>
 
-        <div className="bg-white dark:bg-slate-900 p-2 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-1">
-          {(['all', 'payment', 'invoice'] as const).map((type) => (
-            <button
-              key={type}
-              onClick={() => setTypeFilter(type)}
-              className={cn(
-                "flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all",
-                typeFilter === type 
-                  ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-lg" 
-                  : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-              )}
-            >
-              {type}
-            </button>
-          ))}
-        </div>
+      <div className="bg-white dark:bg-slate-900 p-2 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap items-center gap-1">
+        {(['all', 'payment', 'invoice', 'goods', 'purchase_record', 'expense'] as const).map((type) => (
+          <button
+            key={type}
+            onClick={() => setTypeFilter(type)}
+            className={cn(
+              "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all",
+              typeFilter === type 
+                ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-lg" 
+                : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+            )}
+          >
+            {type === 'purchase_record' ? 'Purchases' : type}
+          </button>
+        ))}
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
@@ -159,7 +174,7 @@ export default function DailySalesDetail() {
               <tr className="bg-slate-50/90 dark:bg-slate-800/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-700">
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Date</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Type</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Customer</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Customer / Party</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Amount</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ref / Status</th>
               </tr>
@@ -178,7 +193,7 @@ export default function DailySalesDetail() {
                     <div className="bg-slate-100 dark:bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                       <Search className="text-slate-400" size={32} />
                     </div>
-                    <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">No matching sales recorded</p>
+                    <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">No matching records found</p>
                   </td>
                 </tr>
               ) : (
@@ -210,11 +225,13 @@ export default function DailySalesDetail() {
                           <td className="px-6 py-4">
                             <span className={cn(
                               "text-[9px] font-black uppercase px-2 py-0.5 rounded-md",
-                              tx.type === 'invoice' 
-                                ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
-                                : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                              tx.type === 'invoice' && "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
+                              tx.type === 'payment' && "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+                              tx.type === 'goods' && "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
+                              tx.type === 'purchase_record' && "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400",
+                              tx.type === 'expense' && "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                             )}>
-                              {tx.type}
+                              {tx.type === 'purchase_record' ? 'purchase' : tx.type}
                             </span>
                           </td>
                           <td className="px-6 py-4">
@@ -226,14 +243,19 @@ export default function DailySalesDetail() {
                             </div>
                           </td>
                           <td className="px-6 py-4 text-right">
-                            <span className="font-black text-slate-900 dark:text-white">{formatCurrency(tx.amount)}</span>
+                            <span className={cn(
+                              "font-black",
+                              tx.amount >= 0 ? "text-emerald-600" : "text-rose-600"
+                            )}>
+                              {tx.amount > 0 ? '+' : ''}{formatCurrency(tx.amount)}
+                            </span>
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex flex-col">
                               <span className="text-[10px] font-mono text-slate-400">{tx.reference}</span>
                               <span className={cn(
                                 "text-[9px] font-black uppercase",
-                                tx.status === 'paid' || tx.status === 'cash' || tx.status === 'upi'
+                                (tx.status === 'paid' || tx.status === 'cash' || tx.status === 'upi' || tx.status === 'invoiced' || tx.status === 'purchased')
                                   ? "text-emerald-600"
                                   : "text-rose-600"
                               )}>
